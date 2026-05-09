@@ -1,4 +1,3 @@
-from skforecast.sarimax._sarimax import Sarimax
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
@@ -56,6 +55,7 @@ class ModelBuilder:
         print(f'ADF statistic: {result[0]}, p-value: {result[1]}')
         return True if result[1] <= 0.05 else False
 
+    # This method checks if the time series data is stationary using the Augmented Dickey-Fuller (ADF) test. If the data is not stationary, it applies differencing to the data up to two times to try to make it stationary. If the data still isn't stationary after differencing twice, it raises an exception indicating that further evaluation is required.
     def data_stationarity_check(self, col_name: str):
         if not self.__data_stationarity_test(col_name):
             # difference the data once or twice to make it stationary
@@ -79,6 +79,7 @@ class ModelBuilder:
         plot_acf(self.data[col_name], lags=lags),
         plot_pacf(self.data[col_name], lags=lags)
 
+    # This method is used to find the best SARIMA model parameters using a grid search approach. It iterates through all possible combinations of parameters and fits a SARIMA model for each combination. The root mean squared error (RMSE) is calculated for each model, and the parameters that yield the lowest RMSE are returned as the best parameters.
     def choosing_sarima_model(self, col_name: str) -> tuple[tuple, float]:
         param_grid = {
             "p": [0, 1, 2, 3],
@@ -95,7 +96,7 @@ class ModelBuilder:
         for param in params:
             try:
                 # Define and fit SARIMAX model
-                model = Sarimax(order=(param[0], param[1], param[2]),
+                model = SARIMAX(order=(param[0], param[1], param[2]),
                                 seasonal_order=(param[3], param[4], param[5], param[6]))
                 model.fit(y=self.training_data[col_name])
 
@@ -141,7 +142,7 @@ class ModelBuilder:
     def test_model(self, col_name, start_idx: Union[None, int] = None, end_idx: Union[None, int] = None):
         start_idx = self.training_data.shape[0] if start_idx is None else start_idx
         end_idx = self.data.shape[0] - 1 if end_idx is None else end_idx
-        predict_args = {"steps": len(self.testing_data)} if isinstance(self.model, Sarimax) else {"start": start_idx,
+        predict_args = {"steps": len(self.testing_data)} if isinstance(self.model, SARIMAX) else {"start": start_idx,
                                                                                                   "end": end_idx}
         predictions = self.model.predict(**predict_args)
         rmse = np.sqrt(mean_squared_error(self.testing_data[col_name], predictions))

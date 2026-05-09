@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: hvas-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: hvas-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PRODUCTION_DB_PATH
+        value: /var/data/production_operations.sqlite3
+      - key: SIMULATION_STATE_PATH
+        value: /var/data/simulation_state.json
+      - key: ORDER_ASSISTANT_STATE_PATH
+        value: /var/data/order_assistant_state.json
