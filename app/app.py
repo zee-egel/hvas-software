@@ -1,20 +1,60 @@
-from flask import Flask, jsonify, render_template, request
+from functools import wraps
+
+from flask import Flask, jsonify, render_template, request, session
 from flask_cors import CORS
 
 try:
-    from settings import CSV_DIR, PRODUCTION_DB_PATH, STATE_PATH
+    from settings import (
+        CSV_DIR,
+        FRONTEND_ORIGIN,
+        PRODUCTION_DB_URL,
+        SECRET_KEY,
+        SESSION_COOKIE_SAMESITE,
+        SESSION_COOKIE_SECURE,
+        STATE_PATH,
+    )
     from production_service import ProductionOperationsService
     from simulation_service import InventorySimulationService
 except ImportError:
-    from .settings import CSV_DIR, PRODUCTION_DB_PATH, STATE_PATH
+    from .settings import (
+        CSV_DIR,
+        FRONTEND_ORIGIN,
+        PRODUCTION_DB_URL,
+        SECRET_KEY,
+        SESSION_COOKIE_SAMESITE,
+        SESSION_COOKIE_SECURE,
+        STATE_PATH,
+    )
     from .production_service import ProductionOperationsService
     from .simulation_service import InventorySimulationService
 
 
 app = Flask(__name__)
-CORS(app)
-order_assistant = ProductionOperationsService(db_path=PRODUCTION_DB_PATH)
+CORS(app, supports_credentials=True, origins=[FRONTEND_ORIGIN])
+app.secret_key = SECRET_KEY
+app.config["SESSION_COOKIE_SECURE"] = SESSION_COOKIE_SECURE
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = SESSION_COOKIE_SAMESITE
+order_assistant = ProductionOperationsService(db_url=PRODUCTION_DB_URL)
 live_simulation = InventorySimulationService(csv_dir=CSV_DIR, state_path=STATE_PATH)
+
+
+def current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    return order_assistant.get_user_by_id(int(user_id))
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = current_user()
+        if user is None:
+            return jsonify({"success": False, "error": "Authentication required."}), 401
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 @app.errorhandler(ValueError)
@@ -38,65 +78,115 @@ def get_api_health():
     return jsonify(order_assistant.get_health())
 
 
+@app.get("/api/auth/session")
+def get_auth_session():
+    user = current_user()
+    return jsonify({"authenticated": user is not None, "user": user})
+
+
+@app.post("/api/auth/signup")
+def signup():
+    payload = request.get_json() or {}
+    user = order_assistant.create_user(
+        full_name=str(payload.get("fullName", "")),
+        email=str(payload.get("email", "")),
+        company_name=str(payload.get("companyName", "")),
+        password=str(payload.get("password", "")),
+    )
+    session["user_id"] = user["id"]
+    session.permanent = bool(payload.get("rememberMe", True))
+    return jsonify({"success": True, "user": user})
+
+
+@app.post("/api/auth/login")
+def login():
+    payload = request.get_json() or {}
+    user = order_assistant.authenticate_user(
+        email=str(payload.get("email", "")),
+        password=str(payload.get("password", "")),
+    )
+    session["user_id"] = user["id"]
+    session.permanent = bool(payload.get("rememberMe", True))
+    return jsonify({"success": True, "user": user})
+
+
+@app.post("/api/auth/logout")
+def logout():
+    session.clear()
+    return jsonify({"success": True})
+
+
 @app.get("/api/restaurant")
+@login_required
 def get_restaurant():
     return jsonify(order_assistant.get_restaurant())
 
 
 @app.get("/api/order-advice")
+@login_required
 def get_order_advice():
     return jsonify(order_assistant.get_order_advice())
 
 
 @app.get("/api/live-simulation")
+@login_required
 def get_live_simulation():
     return jsonify(live_simulation.get_state())
 
 
 @app.post("/api/live-simulation/start")
+@login_required
 def start_live_simulation():
     return jsonify(live_simulation.start())
 
 
 @app.post("/api/live-simulation/stop")
+@login_required
 def stop_live_simulation():
     return jsonify(live_simulation.stop())
 
 
 @app.post("/api/live-simulation/tick")
+@login_required
 def tick_live_simulation():
     return jsonify(live_simulation.tick())
 
 
 @app.post("/api/live-simulation/reset")
+@login_required
 def reset_live_simulation():
     return jsonify(live_simulation.reset())
 
 
 @app.post("/api/live-simulation/config")
+@login_required
 def update_live_simulation_config():
     payload = request.get_json() or {}
     return jsonify(live_simulation.update_config(payload))
 
 
 @app.get("/api/purchase-orders")
+@login_required
 def get_purchase_orders():
     return jsonify(order_assistant.get_purchase_orders())
 
 
 @app.post("/api/purchase-orders/<purchase_order_id>/approve")
+@login_required
 def approve_purchase_order(purchase_order_id: str):
     snapshot = order_assistant.approve_purchase_order(purchase_order_id)
     return jsonify({"success": True, "snapshot": snapshot})
 
 
 @app.post("/api/purchase-orders/<purchase_order_id>/reject")
+@login_required
 def reject_purchase_order(purchase_order_id: str):
     snapshot = order_assistant.reject_purchase_order(purchase_order_id)
     return jsonify({"success": True, "snapshot": snapshot})
 
 
 @app.post("/api/inventory")
+@login_required
 def update_inventory():
     # Compatibility route for the existing inventory page.
     payload = request.get_json() or {}
@@ -115,6 +205,7 @@ def update_inventory():
 
 
 @app.post("/api/import/sales")
+@login_required
 def import_sales():
     payload = request.get_json() or {}
     items = payload.get("items", [])
@@ -123,6 +214,7 @@ def import_sales():
 
 
 @app.post("/api/import/inventory-counts")
+@login_required
 def import_inventory_counts():
     payload = request.get_json() or {}
     items = payload.get("items", [])
@@ -137,6 +229,7 @@ def import_inventory_counts():
 
 
 @app.post("/api/import/receipts")
+@login_required
 def import_receipts():
     payload = request.get_json() or {}
     items = payload.get("items", [])
@@ -145,6 +238,7 @@ def import_receipts():
 
 
 @app.post("/api/import/waste")
+@login_required
 def import_waste():
     payload = request.get_json() or {}
     items = payload.get("items", [])
@@ -153,11 +247,13 @@ def import_waste():
 
 
 @app.get("/api/import/status")
+@login_required
 def get_import_status():
     return jsonify(order_assistant.get_import_status())
 
 
 @app.post("/api/import/historical-dataset")
+@login_required
 def import_historical_dataset():
     upload = request.files.get("file")
     if upload is None or not upload.filename:
@@ -174,22 +270,26 @@ def import_historical_dataset():
 
 
 @app.get("/api/config/products")
+@login_required
 def get_config_products():
     return jsonify({"items": order_assistant.get_config_products()})
 
 
 @app.patch("/api/config/products/<int:product_id>")
+@login_required
 def patch_config_product(product_id: int):
     payload = request.get_json() or {}
     return jsonify(order_assistant.patch_product(product_id, payload))
 
 
 @app.get("/api/config/suppliers")
+@login_required
 def get_config_suppliers():
     return jsonify({"items": order_assistant.get_config_suppliers()})
 
 
 @app.patch("/api/config/suppliers/<int:supplier_id>")
+@login_required
 def patch_config_supplier(supplier_id: int):
     payload = request.get_json() or {}
     return jsonify(order_assistant.patch_supplier(supplier_id, payload))

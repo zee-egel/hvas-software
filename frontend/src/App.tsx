@@ -1,4 +1,14 @@
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import {
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { SimulationProvider } from "./SimulationContext";
+import { useSimulation } from "./useSimulation";
+import { useAuth } from "./AuthContext";
 import Logo from "./components/Logo";
 import {
   BarChart3,
@@ -17,6 +27,9 @@ import IntelligencePage from "./components/IntelligencePage";
 import LiveSimulationPage from "./components/LiveSimulationPage";
 import PurchasingPage from "./components/PurchasingPage";
 import SettingsPage from "./components/SettingsPage";
+import LoginPage from "./components/auth/LoginPage";
+import SignupPage from "./components/auth/SignupPage";
+import { LoadingState } from "./components/PageState";
 
 const navigation = [
   { to: "/overview", label: "Executive Summary", icon: LayoutDashboard },
@@ -26,11 +39,15 @@ const navigation = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-function AppShell() {
+function ProtectedAppShell() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { refresh } = useSimulation();
+
   return (
     <div className="min-h-screen bg-[#fbfcfb] text-heading">
       <div className="grid min-h-screen grid-cols-[160px_1fr]">
-        <aside className="flex min-h-screen flex-col border-r border-border bg-white">
+        <aside className="sticky top-0 flex h-screen flex-col border-r border-border bg-white">
           <div className="flex items-center gap-3 px-4 py-5">
             <Logo className="h-10 w-10 rounded-lg object-contain" />
             <div className="min-w-0">
@@ -59,15 +76,24 @@ function AppShell() {
           </nav>
 
           <div className="px-3 pb-4">
-            <button className="w-full rounded-sm bg-emerald-dark px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(13,90,67,0.18)] transition-opacity hover:opacity-90">
+            <button
+              onClick={() => navigate("/purchasing")}
+              className="w-full rounded-sm bg-emerald-dark px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(13,90,67,0.18)] transition-opacity hover:opacity-90"
+            >
               Create Purchase Order
             </button>
             <div className="mt-5 border-t border-border pt-4">
-              <button className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading">
+              <button
+                onClick={() => window.open("mailto:support@hvas.io", "_blank")}
+                className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading"
+              >
                 <LifeBuoy className="h-4 w-4" />
                 Help Center
               </button>
-              <button className="mt-1 flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] text-subtitle transition-colors hover:bg-[#fff5f4] hover:text-alert">
+              <button
+                onClick={() => void logout()}
+                className="mt-1 flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-[13px] text-subtitle transition-colors hover:bg-[#fff5f4] hover:text-alert"
+              >
                 <LogOut className="h-4 w-4" />
                 Log Out
               </button>
@@ -87,21 +113,31 @@ function AppShell() {
             </div>
 
             <div className="ml-6 flex items-center gap-4">
-              <button className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading">
+              <button
+                onClick={() => navigate("/overview")}
+                className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading"
+                title="Notifications"
+              >
                 <Bell className="h-4 w-4" />
               </button>
-              <button className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading">
+              <button
+                onClick={() => void refresh()}
+                className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading"
+                title="Refresh data"
+              >
                 <RefreshCw className="h-4 w-4" />
               </button>
               <div className="flex items-center gap-3 border-l border-border pl-4">
                 <div className="h-9 w-9 rounded-full bg-[#d7fff1] text-center text-sm font-semibold leading-9 text-emerald-dark">
-                  CM
+                  {user?.initials ?? "HV"}
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-heading">
-                    Chef Marcus
+                    {user?.fullName ?? "HVAS User"}
                   </p>
-                  <p className="text-[11px] text-body">Central Kitchen</p>
+                  <p className="text-[11px] text-body">
+                    {user?.companyName ?? "HVAS"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -129,6 +165,37 @@ function AppShell() {
   );
 }
 
+function ProtectedApp() {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg px-5 py-10">
+        <div className="mx-auto max-w-4xl">
+          <LoadingState title="Loading your workspace..." />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  return (
+    <SimulationProvider>
+      <ProtectedAppShell />
+    </SimulationProvider>
+  );
+}
+
 export default function App() {
-  return <AppShell />;
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="*" element={<ProtectedApp />} />
+    </Routes>
+  );
 }

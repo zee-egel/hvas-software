@@ -2,6 +2,121 @@ interface IconProps {
   className?: string;
 }
 
+export function Mail({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  );
+}
+
+export function Lock({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+    </svg>
+  );
+}
+
+export function User({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M19 21a7 7 0 0 0-14 0" />
+      <circle cx="12" cy="8" r="4" />
+    </svg>
+  );
+}
+
+export function Building({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M9 8h1" />
+      <path d="M14 8h1" />
+      <path d="M9 12h1" />
+      <path d="M14 12h1" />
+      <path d="M10 21v-4h4v4" />
+    </svg>
+  );
+}
+
+export function Fingerprint({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 10a2 2 0 0 0-2 2c0 1.3-.1 2.6-.4 3.8" />
+      <path d="M14 13.2c0 2.4-.6 4.7-1.7 6.8" />
+      <path d="M6 12a6 6 0 0 1 12 0c0 3.5-.8 6.9-2.4 10" />
+      <path d="M4 12a8 8 0 0 1 16 0" />
+      <path d="M8.5 19.5c.6-2.1.9-4.3.9-6.5a2.6 2.6 0 1 1 5.2 0c0 1.1-.1 2.2-.3 3.2" />
+    </svg>
+  );
+}
+
+export function ArrowRight({ className }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
 export function LayoutDashboard({ className }: IconProps) {
   return (
     <svg

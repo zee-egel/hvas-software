@@ -5,7 +5,6 @@ from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 import json
 from math import ceil
-from pathlib import Path
 import re
 from typing import Any
 
@@ -29,6 +28,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
+from werkzeug.security import check_password_hash, generate_password_hash
 
 try:
     from data.restaurant_simulation import RESTAURANT_PROFILE
@@ -102,10 +102,9 @@ def normalize_column_name(value: str) -> str:
 
 
 class ProductionOperationsService:
-    def __init__(self, db_path: str) -> None:
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine: Engine = create_engine(f"sqlite:///{self.db_path}", future=True)
+    def __init__(self, db_url: str) -> None:
+        self.db_url = db_url
+        self.engine: Engine = create_engine(db_url, future=True, pool_pre_ping=True)
         self.metadata = MetaData()
         self._define_tables()
         self.metadata.create_all(self.engine)
@@ -245,6 +244,18 @@ class ProductionOperationsService:
             Column("blocking_issues_json", Text, nullable=False),
             Column("snapshot_json", Text, nullable=False),
         )
+        self.users = Table(
+            "users",
+            self.metadata,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("full_name", String(255), nullable=False),
+            Column("email", String(255), unique=True, nullable=False),
+            Column("company_name", String(255), nullable=False),
+            Column("password_hash", Text, nullable=False),
+            Column("role", String(120), nullable=False, default="operator"),
+            Column("created_at", DateTime(timezone=True), nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False),
+        )
 
     def _bootstrap_if_empty(self) -> None:
         with self.engine.begin() as conn:
@@ -364,6 +375,63 @@ class ProductionOperationsService:
                 "latestImportType": latest_import["import_type"] if latest_import else None,
             },
         }
+
+    def create_user(
+        self,
+        full_name: str,
+        email: str,
+        company_name: str,
+        password: str,
+    ) -> dict[str, Any]:
+        normalized_email = email.strip().lower()
+        if "@" not in normalized_email:
+            raise ValueError("Enter a valid work email address.")
+        if len(password) < 8:
+            raise ValueError("Password must contain at least 8 characters.")
+        if not full_name.strip():
+            raise ValueError("Full name is required.")
+        if not company_name.strip():
+            raise ValueError("Company name is required.")
+
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.users).where(func.lower(self.users.c.email) == normalized_email)
+            ).mappings().first()
+            if existing is not None:
+                raise ValueError("An account already exists for that email address.")
+            now = parse_dt(utc_timestamp())
+            result = conn.execute(
+                insert(self.users).values(
+                    full_name=full_name.strip(),
+                    email=normalized_email,
+                    company_name=company_name.strip(),
+                    password_hash=generate_password_hash(password),
+                    role="admin",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            user_id = int(result.inserted_primary_key[0])
+        return self.get_user_by_id(user_id)
+
+    def authenticate_user(self, email: str, password: str) -> dict[str, Any]:
+        normalized_email = email.strip().lower()
+        with self.engine.begin() as conn:
+            user = conn.execute(
+                select(self.users).where(func.lower(self.users.c.email) == normalized_email)
+            ).mappings().first()
+        if user is None or not check_password_hash(user["password_hash"], password):
+            raise ValueError("Invalid email or password.")
+        return self._serialize_user(user)
+
+    def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            user = conn.execute(
+                select(self.users).where(self.users.c.id == user_id)
+            ).mappings().first()
+        if user is None:
+            return None
+        return self._serialize_user(user)
 
     def get_restaurant(self) -> dict[str, Any]:
         inventory = self._current_inventory_snapshot()
@@ -1717,3 +1785,13 @@ class ProductionOperationsService:
         if timestamp is None:
             return "missing"
         return "fresh" if timestamp >= datetime.now(UTC) - timedelta(days=max_age_days) else "stale"
+
+    def _serialize_user(self, user: Any) -> dict[str, Any]:
+        return {
+            "id": int(user["id"]),
+            "fullName": user["full_name"],
+            "email": user["email"],
+            "companyName": user["company_name"],
+            "role": user["role"],
+            "initials": "".join(part[:1].upper() for part in user["full_name"].split()[:2]) or "HV",
+        }

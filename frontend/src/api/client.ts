@@ -13,6 +13,36 @@ function apiUrl(path: string) {
   return `${API_BASE}${path}`;
 }
 
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(apiUrl(path), {
+    credentials: "include",
+    ...init,
+  });
+}
+
+async function readErrorMessage(res: Response, fallback: string) {
+  try {
+    const payload = (await res.json()) as { error?: string };
+    return payload.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export interface AuthUser {
+  id: number;
+  fullName: string;
+  email: string;
+  companyName: string;
+  role: string;
+  initials: string;
+}
+
+export interface AuthSessionResponse {
+  authenticated: boolean;
+  user: AuthUser | null;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -400,13 +430,13 @@ export interface ApiRecipe {
 }
 
 export async function fetchOrderAdvice(): Promise<OrderAdviceResponse> {
-  const res = await fetch(apiUrl("/api/order-advice"));
+  const res = await apiFetch("/api/order-advice");
   if (!res.ok) throw new Error(`Failed to fetch order advice: ${res.status}`);
   return res.json();
 }
 
 export async function fetchRestaurant(): Promise<RestaurantResponse> {
-  const res = await fetch(apiUrl("/api/restaurant"));
+  const res = await apiFetch("/api/restaurant");
   if (!res.ok)
     throw new Error(`Failed to fetch restaurant snapshot: ${res.status}`);
   return res.json();
@@ -418,42 +448,42 @@ export async function fetchPurchaseOrders(): Promise<{
   active: PurchaseOrder[];
   history: PurchaseOrderHistoryItem[];
 }> {
-  const res = await fetch(apiUrl("/api/purchase-orders"));
+  const res = await apiFetch("/api/purchase-orders");
   if (!res.ok)
     throw new Error(`Failed to fetch purchase orders: ${res.status}`);
   return res.json();
 }
 
 export async function fetchLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await fetch(apiUrl("/api/live-simulation"));
+  const res = await apiFetch("/api/live-simulation");
   if (!res.ok)
     throw new Error(`Failed to fetch live simulation: ${res.status}`);
   return res.json();
 }
 
 export async function startLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await fetch(apiUrl("/api/live-simulation/start"), { method: "POST" });
+  const res = await apiFetch("/api/live-simulation/start", { method: "POST" });
   if (!res.ok)
     throw new Error(`Failed to start live simulation: ${res.status}`);
   return res.json();
 }
 
 export async function stopLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await fetch(apiUrl("/api/live-simulation/stop"), { method: "POST" });
+  const res = await apiFetch("/api/live-simulation/stop", { method: "POST" });
   if (!res.ok)
     throw new Error(`Failed to stop live simulation: ${res.status}`);
   return res.json();
 }
 
 export async function tickLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await fetch(apiUrl("/api/live-simulation/tick"), { method: "POST" });
+  const res = await apiFetch("/api/live-simulation/tick", { method: "POST" });
   if (!res.ok)
     throw new Error(`Failed to advance live simulation: ${res.status}`);
   return res.json();
 }
 
 export async function resetLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await fetch(apiUrl("/api/live-simulation/reset"), { method: "POST" });
+  const res = await apiFetch("/api/live-simulation/reset", { method: "POST" });
   if (!res.ok)
     throw new Error(`Failed to reset live simulation: ${res.status}`);
   return res.json();
@@ -462,7 +492,7 @@ export async function resetLiveSimulation(): Promise<LiveSimulationState> {
 export async function updateLiveSimulationConfig(
   config: Partial<LiveSimulationConfig>,
 ): Promise<LiveSimulationConfig> {
-  const res = await fetch(apiUrl("/api/live-simulation/config"), {
+  const res = await apiFetch("/api/live-simulation/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
@@ -475,7 +505,7 @@ export async function updateLiveSimulationConfig(
 export async function approvePurchaseOrder(
   id: string,
 ): Promise<{ success: boolean; snapshot: OrderAdviceResponse }> {
-  const res = await fetch(apiUrl(`/api/purchase-orders/${id}/approve`), {
+  const res = await apiFetch(`/api/purchase-orders/${id}/approve`, {
     method: "POST",
   });
   if (!res.ok)
@@ -486,7 +516,7 @@ export async function approvePurchaseOrder(
 export async function rejectPurchaseOrder(
   id: string,
 ): Promise<{ success: boolean; snapshot: OrderAdviceResponse }> {
-  const res = await fetch(apiUrl(`/api/purchase-orders/${id}/reject`), {
+  const res = await apiFetch(`/api/purchase-orders/${id}/reject`, {
     method: "POST",
   });
   if (!res.ok)
@@ -509,7 +539,7 @@ export async function updateInventory(
   };
   orderAdvice: OrderAdviceResponse;
 }> {
-  const res = await fetch(apiUrl("/api/inventory"), {
+  const res = await apiFetch("/api/inventory", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items }),
@@ -519,13 +549,13 @@ export async function updateInventory(
 }
 
 export async function fetchImportStatus(): Promise<ImportStatusResponse> {
-  const res = await fetch(apiUrl("/api/import/status"));
+  const res = await apiFetch("/api/import/status");
   if (!res.ok) throw new Error(`Failed to fetch import status: ${res.status}`);
   return res.json();
 }
 
 export async function fetchProductConfig(): Promise<ProductConfigItem[]> {
-  const res = await fetch(apiUrl("/api/config/products"));
+  const res = await apiFetch("/api/config/products");
   if (!res.ok) throw new Error(`Failed to fetch product config: ${res.status}`);
   const payload = (await res.json()) as { items: ProductConfigItem[] };
   return payload.items;
@@ -535,7 +565,7 @@ export async function updateProductConfig(
   id: number,
   updates: Partial<ProductConfigItem>,
 ): Promise<ProductConfigItem> {
-  const res = await fetch(apiUrl(`/api/config/products/${id}`), {
+  const res = await apiFetch(`/api/config/products/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
@@ -545,7 +575,7 @@ export async function updateProductConfig(
 }
 
 export async function fetchSupplierConfig(): Promise<SupplierConfigItem[]> {
-  const res = await fetch(apiUrl("/api/config/suppliers"));
+  const res = await apiFetch("/api/config/suppliers");
   if (!res.ok) throw new Error(`Failed to fetch supplier config: ${res.status}`);
   const payload = (await res.json()) as { items: SupplierConfigItem[] };
   return payload.items;
@@ -555,7 +585,7 @@ export async function updateSupplierConfig(
   id: number,
   updates: Partial<SupplierConfigItem>,
 ): Promise<SupplierConfigItem> {
-  const res = await fetch(apiUrl(`/api/config/suppliers/${id}`), {
+  const res = await apiFetch(`/api/config/suppliers/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
@@ -571,13 +601,55 @@ export async function importHistoricalDataset(
   const body = new FormData();
   body.append("file", file);
   body.append("sourceSystem", sourceSystem);
-  const res = await fetch(apiUrl("/api/import/historical-dataset"), {
+  const res = await apiFetch("/api/import/historical-dataset", {
     method: "POST",
     body,
   });
   if (!res.ok) {
     throw new Error(`Failed to import historical dataset: ${res.status}`);
   }
+  return res.json();
+}
+
+export async function fetchAuthSession(): Promise<AuthSessionResponse> {
+  const res = await apiFetch("/api/auth/session");
+  if (!res.ok) throw new Error(`Failed to fetch auth session: ${res.status}`);
+  return res.json();
+}
+
+export async function loginUser(payload: {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}): Promise<{ success: boolean; user: AuthUser }> {
+  const res = await apiFetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `Failed to login: ${res.status}`));
+  return res.json();
+}
+
+export async function signupUser(payload: {
+  fullName: string;
+  email: string;
+  companyName: string;
+  password: string;
+  rememberMe?: boolean;
+}): Promise<{ success: boolean; user: AuthUser }> {
+  const res = await apiFetch("/api/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, `Failed to sign up: ${res.status}`));
+  return res.json();
+}
+
+export async function logoutUser(): Promise<{ success: boolean }> {
+  const res = await apiFetch("/api/auth/logout", { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to logout: ${res.status}`);
   return res.json();
 }
 

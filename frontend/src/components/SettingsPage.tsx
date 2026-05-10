@@ -62,12 +62,22 @@ const configLabels: Array<{
 ];
 
 export default function SettingsPage() {
-  const { data, liveSimulation, saveSimulationConfig, loading, error, refresh } =
-    useSimulation();
+  const {
+    data,
+    liveSimulation,
+    saveSimulationConfig,
+    loading,
+    error,
+    refresh,
+  } = useSimulation();
   const [draft, setDraft] = useState<LiveSimulationConfig | null>(null);
-  const [importStatus, setImportStatus] = useState<ImportStatusResponse | null>(null);
+  const [importStatus, setImportStatus] = useState<ImportStatusResponse | null>(
+    null,
+  );
   const [productConfig, setProductConfig] = useState<ProductConfigItem[]>([]);
-  const [supplierConfig, setSupplierConfig] = useState<SupplierConfigItem[]>([]);
+  const [supplierConfig, setSupplierConfig] = useState<SupplierConfigItem[]>(
+    [],
+  );
   const [opsLoading, setOpsLoading] = useState(true);
   const [opsError, setOpsError] = useState<string | null>(null);
   const [datasetFile, setDatasetFile] = useState<File | null>(null);
@@ -115,7 +125,8 @@ export default function SettingsPage() {
     };
   }, []);
 
-  if (loading && !liveSimulation) return <LoadingState title="Loading settings..." />;
+  if (loading && !liveSimulation)
+    return <LoadingState title="Loading settings..." />;
   if (!liveSimulation || !draft)
     return (
       <ErrorState
@@ -237,9 +248,7 @@ export default function SettingsPage() {
                 <label className="text-sm font-semibold text-heading">
                   {field.label}
                 </label>
-                <p className="mt-1 text-sm leading-5 text-body">
-                  {field.help}
-                </p>
+                <p className="mt-1 text-sm leading-5 text-body">{field.help}</p>
                 <input
                   type="number"
                   value={draft[field.key]}
@@ -324,7 +333,12 @@ export default function SettingsPage() {
                     <p className="text-sm font-semibold text-heading">{name}</p>
                     <p className="text-xs text-body">{role}</p>
                   </div>
-                  <button className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle">
+                  <button
+                    onClick={() =>
+                      alert(`User management for ${name} coming soon.`)
+                    }
+                    className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle"
+                  >
                     Manage
                   </button>
                 </div>
@@ -341,18 +355,23 @@ export default function SettingsPage() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-body">
           Upload one CSV with daily product history and HVAS will rebuild the
           production dataset, recompute forecasts, and refresh the dashboard.
-          Required columns: <code>date</code>, <code>sales_qty</code>, and either
-          <code> product_id</code> or <code>product_name</code>. Recommended columns:
-          <code> stock_on_hand</code>, <code>receipts_qty</code>, <code>waste_qty</code>,
-          <code> supplier_name</code>, <code>unit</code>, <code>category</code>,
-          <code>cost_price</code>, <code>selling_price</code>, <code>safety_stock</code>,
+          Required columns: <code>date</code>, <code>sales_qty</code>, and
+          either
+          <code> product_id</code> or <code>product_name</code>. Recommended
+          columns:
+          <code> stock_on_hand</code>, <code>receipts_qty</code>,{" "}
+          <code>waste_qty</code>,<code> supplier_name</code>, <code>unit</code>,{" "}
+          <code>category</code>,<code>cost_price</code>,{" "}
+          <code>selling_price</code>, <code>safety_stock</code>,
           <code>lead_time_days</code>.
         </p>
         <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
           <input
             type="file"
             accept=".csv,text/csv"
-            onChange={(event) => setDatasetFile(event.target.files?.[0] ?? null)}
+            onChange={(event) =>
+              setDatasetFile(event.target.files?.[0] ?? null)
+            }
             className="h-11 rounded-xl border border-border bg-[#fbfcfb] px-3 py-2 text-sm text-heading outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-dark file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
           />
           <button
@@ -366,20 +385,21 @@ export default function SettingsPage() {
         </div>
         {datasetResult ? (
           <div className="mt-4 rounded-xl bg-[#f7faf8] p-4 text-sm text-heading">
-            Imported {datasetResult.rowsProcessed} rows across {datasetResult.productsTouched} products.
-            Sales accepted: {datasetResult.importResults.sales?.acceptedCount ?? 0}. Counts accepted:{" "}
-            {datasetResult.importResults.inventoryCounts?.acceptedCount ?? 0}. Receipts accepted:{" "}
-            {datasetResult.importResults.receipts?.acceptedCount ?? 0}. Waste accepted:{" "}
-            {datasetResult.importResults.waste?.acceptedCount ?? 0}.
+            Imported {datasetResult.rowsProcessed} rows across{" "}
+            {datasetResult.productsTouched} products. Sales accepted:{" "}
+            {datasetResult.importResults.sales?.acceptedCount ?? 0}. Counts
+            accepted:{" "}
+            {datasetResult.importResults.inventoryCounts?.acceptedCount ?? 0}.
+            Receipts accepted:{" "}
+            {datasetResult.importResults.receipts?.acceptedCount ?? 0}. Waste
+            accepted: {datasetResult.importResults.waste?.acceptedCount ?? 0}.
           </div>
         ) : null}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-2xl border border-border bg-white p-5">
-          <p className="text-lg font-semibold text-heading">
-            Import Pipeline
-          </p>
+          <p className="text-lg font-semibold text-heading">Import Pipeline</p>
           <p className="mt-2 text-sm text-body">
             Production data is ingested into the operational database through
             typed import jobs. Latest jobs and advice recompute status are shown
@@ -397,7 +417,9 @@ export default function SettingsPage() {
                 </p>
                 <p className="mt-1 text-body">
                   {importStatus?.latestAdviceRunAt
-                    ? new Date(importStatus.latestAdviceRunAt).toLocaleString("nl-NL")
+                    ? new Date(importStatus.latestAdviceRunAt).toLocaleString(
+                        "nl-NL",
+                      )
                     : "No advice run recorded yet"}
                 </p>
               </div>
@@ -415,11 +437,13 @@ export default function SettingsPage() {
                     </span>
                   </div>
                   <p className="mt-2 text-xs text-body">
-                    Source: {job.sourceSystem} • accepted {job.acceptedCount} / {job.recordCount}
+                    Source: {job.sourceSystem} • accepted {job.acceptedCount} /{" "}
+                    {job.recordCount}
                   </p>
                   {job.rejectedCount > 0 ? (
                     <p className="mt-2 text-xs text-alert">
-                      {job.rejectedCount} rejected records require reconciliation.
+                      {job.rejectedCount} rejected records require
+                      reconciliation.
                     </p>
                   ) : null}
                 </div>
@@ -434,7 +458,8 @@ export default function SettingsPage() {
               Supplier Lead Times
             </p>
             <p className="mt-2 text-sm text-body">
-              These values directly affect lead-time demand and purchase-order timing.
+              These values directly affect lead-time demand and purchase-order
+              timing.
             </p>
             <div className="mt-5 space-y-3">
               {supplierConfig.slice(0, 4).map((supplier) => (
@@ -490,7 +515,8 @@ export default function SettingsPage() {
               Product Reorder Defaults
             </p>
             <p className="mt-2 text-sm text-body">
-              Safety stock and reorder multiple feed directly into the production advice calculation.
+              Safety stock and reorder multiple feed directly into the
+              production advice calculation.
             </p>
             <div className="mt-5 space-y-3">
               {productConfig.slice(0, 4).map((product) => (
@@ -503,7 +529,8 @@ export default function SettingsPage() {
                       {product.name}
                     </p>
                     <p className="mt-1 text-xs text-body">
-                      {product.category} • {product.supplierName ?? "Unmapped supplier"}
+                      {product.category} •{" "}
+                      {product.supplierName ?? "Unmapped supplier"}
                     </p>
                   </div>
                   <input
@@ -515,7 +542,10 @@ export default function SettingsPage() {
                       setProductConfig((current) =>
                         current.map((item) =>
                           item.id === product.id
-                            ? { ...item, safetyStock: Number(event.target.value) }
+                            ? {
+                                ...item,
+                                safetyStock: Number(event.target.value),
+                              }
                             : item,
                         ),
                       )
@@ -531,7 +561,10 @@ export default function SettingsPage() {
                       setProductConfig((current) =>
                         current.map((item) =>
                           item.id === product.id
-                            ? { ...item, reorderMultiple: Number(event.target.value) }
+                            ? {
+                                ...item,
+                                reorderMultiple: Number(event.target.value),
+                              }
                             : item,
                         ),
                       )

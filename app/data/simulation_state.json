@@ -1,5 +1,5 @@
 {
-  "current_week": 25,
+  "current_week": 5,
   "config": {
     "order_variance": 18,
     "restock_threshold": 1200,
@@ -9,203 +9,21 @@
     "waste_variance_pct": 3,
     "learning_rate_pct": 22
   },
-  "accuracy_history": [
-    66.67,
-    100.0,
-    0.0,
-    0.0,
-    100.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    100.0,
-    100.0,
-    0.0,
-    0.0,
-    100.0,
-    100.0,
-    100.0,
-    100.0,
-    0.0,
-    50.0,
-    100.0
-  ],
-  "generated_orders": [
-    {
-      "week": 5,
-      "recipe_id": 1,
-      "num_orders": 3
-    },
-    {
-      "week": 6,
-      "recipe_id": 1,
-      "num_orders": 3
-    },
-    {
-      "week": 7,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 8,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 9,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 10,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 11,
-      "recipe_id": 1,
-      "num_orders": 2
-    },
-    {
-      "week": 12,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 13,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 14,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 15,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 16,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 17,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 18,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 19,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 20,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 21,
-      "recipe_id": 1,
-      "num_orders": 0
-    },
-    {
-      "week": 22,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 23,
-      "recipe_id": 1,
-      "num_orders": 2
-    },
-    {
-      "week": 24,
-      "recipe_id": 1,
-      "num_orders": 2
-    }
-  ],
+  "accuracy_history": [],
+  "generated_orders": [],
   "last_tick": {
-    "predicted_food_orders": {
-      "Pasta": 2
-    },
-    "food_orders_this_week": {
-      "Pasta": 2
-    },
+    "predicted_food_orders": {},
+    "food_orders_this_week": {},
     "restocked_ingredients": {},
-    "ingredient_usage": [
-      {
-        "ingredientId": 1,
-        "ingredientName": "tomato",
-        "expectedUsage": 8.0,
-        "actualUsage": 8.51,
-        "learnedMultiplier": 1.029,
-        "confidence": 1.0,
-        "variancePct": 6.3
-      },
-      {
-        "ingredientId": 4,
-        "ingredientName": "basil",
-        "expectedUsage": 2.0,
-        "actualUsage": 2.13,
-        "learnedMultiplier": 1.058,
-        "confidence": 1.0,
-        "variancePct": 6.3
-      },
-      {
-        "ingredientId": 3,
-        "ingredientName": "cheese",
-        "expectedUsage": 4.0,
-        "actualUsage": 4.19,
-        "learnedMultiplier": 1.011,
-        "confidence": 1.0,
-        "variancePct": 4.8
-      },
-      {
-        "ingredientId": 2,
-        "ingredientName": "spaghetti",
-        "expectedUsage": 2.0,
-        "actualUsage": 2.02,
-        "learnedMultiplier": 1.022,
-        "confidence": 1.0,
-        "variancePct": 1.2
-      }
-    ],
-    "recent_events": [
-      "tomato ran 6.3% above recipe expectation."
-    ]
+    "ingredient_usage": [],
+    "recent_events": []
   },
   "inventory_levels": {
     "1": 6674.849277653641,
     "2": 1668.9788899326986,
     "3": 3339.9585532253072,
-    "4": 1668.0633629769623
+    "4": 1668.0633629769625
   },
-  "usage_profiles": {
-    "1:1": {
-      "learned_multiplier": 1.0287430817828187,
-      "observations": 20.0
-    },
-    "1:2": {
-      "learned_multiplier": 1.021595433970629,
-      "observations": 20.0
-    },
-    "1:3": {
-      "learned_multiplier": 1.011299846475773,
-      "observations": 20.0
-    },
-    "1:4": {
-      "learned_multiplier": 1.0582996568360932,
-      "observations": 20.0
-    }
-  },
-  "running": true
+  "usage_profiles": {},
+  "running": false
 }

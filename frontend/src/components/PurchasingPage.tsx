@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSimulation } from "../useSimulation";
 import { ChevronRight, Package } from "./Icons";
 import { ErrorState, LoadingState } from "./PageState";
@@ -14,6 +14,31 @@ function euro(value: number) {
 
 export default function PurchasingPage() {
   const { data, approveOrder, loading, error, refresh } = useSimulation();
+  const [activeTab, setActiveTab] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [urgencyFilter, setUrgencyFilter] = useState<string | null>(null);
+  const draftRef = useRef<HTMLDivElement>(null);
+  const supplierRef = useRef<HTMLElement>(null);
+  const historyRef = useRef<HTMLElement>(null);
+
+  const tabs = [
+    "Draft Orders",
+    "Supplier Performance",
+    "Order History",
+  ] as const;
+  const tabRefs = [draftRef, supplierRef, historyRef];
+
+  function handleTabClick(index: number) {
+    setActiveTab(index);
+    setTimeout(
+      () =>
+        tabRefs[index]?.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      50,
+    );
+  }
 
   const supplierMetrics = useMemo(() => {
     if (!data) return [];
@@ -61,7 +86,15 @@ export default function PurchasingPage() {
     );
 
   const draftOrders = data.purchaseOrders.active.slice(0, 2);
-  const adviceRows = data.products.slice(0, 4);
+  const categories = useMemo(
+    () => [...new Set(data.products.map((p) => p.product.category))],
+    [data],
+  );
+  const urgencies = ["high", "medium", "low"] as const;
+  const adviceRows = data.products
+    .filter((p) => !categoryFilter || p.product.category === categoryFilter)
+    .filter((p) => !urgencyFilter || p.urgency === urgencyFilter)
+    .slice(0, 4);
   const purchaseHistory = data.purchaseOrders.history.slice(0, 4);
   const totalDraftValue = data.purchaseOrders.active.reduce(
     (sum, order) => sum + order.totalAmount,
@@ -86,20 +119,19 @@ export default function PurchasingPage() {
           </p>
         </div>
         <div className="rounded-xl bg-white p-1 shadow-[0_6px_24px_rgba(17,38,31,0.05)]">
-          {["Draft Orders", "Supplier Performance", "Order History"].map(
-            (tab, index) => (
-              <button
-                key={tab}
-                className={`rounded-sm px-4 py-2 text-sm font-medium ${
-                  index === 0
-                    ? "bg-[#f5faf7] text-emerald-dark"
-                    : "text-subtitle"
-                }`}
-              >
-                {tab}
-              </button>
-            ),
-          )}
+          {tabs.map((tab, index) => (
+            <button
+              key={tab}
+              onClick={() => handleTabClick(index)}
+              className={`rounded-sm px-4 py-2 text-sm font-medium ${
+                activeTab === index
+                  ? "bg-[#f5faf7] text-emerald-dark"
+                  : "text-subtitle"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -156,7 +188,7 @@ export default function PurchasingPage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.55fr_0.8fr]">
-        <div className="space-y-5">
+        <div ref={draftRef} className="space-y-5">
           <div>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-heading">
@@ -234,11 +266,35 @@ export default function PurchasingPage() {
                 Product Advice Intelligence
               </p>
               <div className="flex gap-2">
-                <button className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle">
-                  All Categories
+                <button
+                  onClick={() =>
+                    setCategoryFilter((prev) => {
+                      const idx = categories.indexOf(prev ?? "");
+                      return idx < categories.length - 1
+                        ? (categories[idx + 1] ?? null)
+                        : null;
+                    })
+                  }
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle"
+                >
+                  {categoryFilter ?? "All Categories"}
                 </button>
-                <button className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle">
-                  All Urgency
+                <button
+                  onClick={() =>
+                    setUrgencyFilter((prev) => {
+                      const idx = urgencies.indexOf(
+                        prev as (typeof urgencies)[number],
+                      );
+                      return idx < urgencies.length - 1
+                        ? (urgencies[idx + 1] ?? null)
+                        : null;
+                    })
+                  }
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle"
+                >
+                  {urgencyFilter
+                    ? `${urgencyFilter.charAt(0).toUpperCase()}${urgencyFilter.slice(1)} Urgency`
+                    : "All Urgency"}
                 </button>
               </div>
             </div>
@@ -341,13 +397,56 @@ export default function PurchasingPage() {
         </div>
 
         <div className="space-y-5">
-          <section className="rounded-2xl bg-emerald-dark p-5 text-white">
+          <section
+            ref={supplierRef}
+            className="rounded-2xl bg-emerald-dark p-5 text-white"
+          >
             <p className="text-sm font-semibold">Procurement Actions</p>
-            <button className="mt-5 flex w-full items-center justify-between rounded-sm bg-[#073829] px-4 py-3 text-sm font-semibold">
+            <button
+              onClick={() =>
+                draftRef.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                })
+              }
+              className="mt-5 flex w-full items-center justify-between rounded-sm bg-[#073829] px-4 py-3 text-sm font-semibold"
+            >
               Create New Manual PO
               <ChevronRight className="h-4 w-4" />
             </button>
-            <button className="mt-3 flex w-full items-center justify-between rounded-sm border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-[#c6e0d8]">
+            <button
+              onClick={() => {
+                const rows = data.purchaseOrders.active;
+                const csv = [
+                  [
+                    "Supplier",
+                    "Items",
+                    "Total",
+                    "Expected Delivery",
+                    "Status",
+                  ].join(","),
+                  ...rows.map((o) =>
+                    [
+                      `"${o.supplierName}"`,
+                      o.itemCount,
+                      o.totalAmount.toFixed(2),
+                      new Date(o.expectedDeliveryDate).toLocaleDateString(
+                        "nl-NL",
+                      ),
+                      o.status,
+                    ].join(","),
+                  ),
+                ].join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `purchase-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="mt-3 flex w-full items-center justify-between rounded-sm border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-[#c6e0d8]"
+            >
               Export for ERP
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -435,7 +534,10 @@ export default function PurchasingPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-white">
+      <section
+        ref={historyRef}
+        className="overflow-hidden rounded-2xl border border-border bg-white"
+      >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <p className="text-sm font-semibold text-heading">Order History</p>
           <span className="text-sm text-body">

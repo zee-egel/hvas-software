@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSimulation } from "../useSimulation";
 import { Package, Sliders, Trash } from "./Icons";
 import { ErrorState, LoadingState } from "./PageState";
@@ -7,16 +7,24 @@ import ProductionStatusBanner from "./ProductionStatusBanner";
 export default function IntelligencePage() {
   const { data, liveSimulation, saveInventory, loading, error, refresh } =
     useSimulation();
-  const [draftStocks, setDraftStocks] = useState<Record<number, string>>({});
+  const tableRef = useRef<HTMLElement>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!data) return;
-    const nextDrafts: Record<number, string> = {};
+  // Derive baseline stocks from data; user edits are stored as overrides on top.
+  const [overrides, setOverrides] = useState<Record<number, string>>({});
+
+  const draftStocks = useMemo<Record<number, string>>(() => {
+    if (!data) return overrides;
+    const base: Record<number, string> = {};
     for (const item of data.products) {
-      nextDrafts[item.product.id] = String(item.currentStock);
+      base[item.product.id] = String(item.currentStock);
     }
-    setDraftStocks(nextDrafts);
-  }, [data]);
+    return { ...base, ...overrides };
+  }, [data, overrides]);
+
+  function setDraftStock(productId: number, value: string) {
+    setOverrides((prev) => ({ ...prev, [productId]: value }));
+  }
 
   const changedItems = useMemo(() => {
     if (!data) return [];
@@ -71,11 +79,17 @@ export default function IntelligencePage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-subtitle">
+          <button
+            onClick={() => filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-subtitle"
+          >
             <Sliders className="h-4 w-4" />
             Filters
           </button>
-          <button className="rounded-xl bg-emerald-dark px-4 py-2.5 text-sm font-semibold text-white">
+          <button
+            onClick={() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="rounded-xl bg-emerald-dark px-4 py-2.5 text-sm font-semibold text-white"
+          >
             New Count
           </button>
         </div>
@@ -133,7 +147,7 @@ export default function IntelligencePage() {
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[0.82fr_1.9fr]">
-        <div className="space-y-4">
+        <div ref={filtersRef} className="space-y-4">
           <div className="rounded-2xl border border-border bg-white p-4">
             <p className="text-sm font-semibold text-heading">
               Top Learning Trends
@@ -223,14 +237,25 @@ export default function IntelligencePage() {
                 </div>
               ))}
             </div>
-            <button className="mt-5 w-full rounded-xl bg-[#b9ffd8] px-4 py-2.5 text-sm font-semibold text-emerald-darkest">
+            <button
+              onClick={() => {
+                const firstCritical = tableItems.find((i) => i.currentStock < i.requiredStock);
+                if (firstCritical) {
+                  document.getElementById(`stock-input-${firstCritical.product.id}`)?.focus();
+                  tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                  tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+              className="mt-5 w-full rounded-xl bg-[#b9ffd8] px-4 py-2.5 text-sm font-semibold text-emerald-darkest"
+            >
               Start Priority Count
             </button>
           </div>
         </div>
 
         <div className="space-y-4">
-          <section className="overflow-hidden rounded-2xl border border-border bg-white">
+          <section ref={tableRef} className="overflow-hidden rounded-2xl border border-border bg-white">
             <table className="min-w-full text-left">
               <thead>
                 <tr className="text-[11px] uppercase tracking-[0.12em] text-body">
@@ -267,11 +292,9 @@ export default function IntelligencePage() {
                           step={0.1}
                           min={0}
                           value={draftStocks[item.product.id] ?? ""}
+                          id={`stock-input-${item.product.id}`}
                           onChange={(event) =>
-                            setDraftStocks((current) => ({
-                              ...current,
-                              [item.product.id]: event.target.value,
-                            }))
+                            setDraftStock(item.product.id, event.target.value)
                           }
                           className={`w-24 rounded-lg border px-3 py-2 text-sm font-semibold outline-none ${
                             item.currentStock < item.product.safetyStock
@@ -307,6 +330,7 @@ export default function IntelligencePage() {
                       </td>
                       <td className="px-5 py-4">
                         <button
+                          onClick={() => document.getElementById(`stock-input-${item.product.id}`)?.focus()}
                           className={`rounded-lg px-3 py-2 text-xs font-semibold ${
                             item.currentStock < item.requiredStock
                               ? "bg-alert text-white"
@@ -361,7 +385,7 @@ export default function IntelligencePage() {
           </section>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <button className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
+            <button onClick={() => alert('Arrival scanning coming soon.')} className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9fff1] text-emerald-dark">
                 <Package className="h-5 w-5" />
               </div>
@@ -372,7 +396,7 @@ export default function IntelligencePage() {
                 </p>
               </div>
             </button>
-            <button className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
+            <button onClick={() => alert('Waste log coming soon.')} className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#fff0ef] text-alert">
                 <Trash className="h-5 w-5" />
               </div>

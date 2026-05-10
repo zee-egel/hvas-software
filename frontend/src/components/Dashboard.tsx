@@ -1,15 +1,9 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSimulation } from "../useSimulation";
 import { ErrorState, LoadingState } from "./PageState";
 import ProductionStatusBanner from "./ProductionStatusBanner";
-import {
-  AlertTriangle,
-  Check,
-  ChevronRight,
-  Play,
-  Truck,
-  Zap,
-} from "./Icons";
+import { AlertTriangle, Check, ChevronRight, Play, Truck, Zap } from "./Icons";
 
 function euro(value: number) {
   return new Intl.NumberFormat("nl-NL", {
@@ -24,7 +18,9 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export default function Dashboard() {
-  const { data, liveSimulation, loading, error, refresh } = useSimulation();
+  const { data, liveSimulation, loading, error, refresh, approveOrder } =
+    useSimulation();
+  const navigate = useNavigate();
 
   const supplierStats = useMemo(() => {
     if (!data) return [];
@@ -46,29 +42,35 @@ export default function Dashboard() {
     return Array.from(grouped.entries()).map(([name, values]) => ({
       name,
       rating:
-        values.reviewCount === 0 ? 98 : Math.max(74, 96 - values.reviewCount * 7),
+        values.reviewCount === 0
+          ? 98
+          : Math.max(74, 96 - values.reviewCount * 7),
       ...values,
     }));
   }, [data]);
   const operationalHealth = useMemo(() => {
     if (!data) return 0;
     const urgentPenalty = data.summary.urgentActions * 4;
-    const reviewPenalty = data.purchaseOrders.active.filter(
-      (order) => order.status === "NEEDS_REVIEW",
-    ).length * 3;
+    const reviewPenalty =
+      data.purchaseOrders.active.filter(
+        (order) => order.status === "NEEDS_REVIEW",
+      ).length * 3;
     const variancePenalty = Math.abs(
       liveSimulation?.variance_summary.average_absolute_skew_pct ?? 0,
     );
     const stockoutPenalty =
       data.evaluation.aggregate.stockoutSimulationRate * 25;
     return clamp(
-      Math.round(100 - urgentPenalty - reviewPenalty - variancePenalty - stockoutPenalty),
+      Math.round(
+        100 - urgentPenalty - reviewPenalty - variancePenalty - stockoutPenalty,
+      ),
       42,
       99,
     );
   }, [data, liveSimulation]);
 
-  if (loading && !data) return <LoadingState title="Loading executive summary..." />;
+  if (loading && !data)
+    return <LoadingState title="Loading executive summary..." />;
   if (!data)
     return (
       <ErrorState
@@ -91,8 +93,7 @@ export default function Dashboard() {
       a.financialImpact.potentialWasteCost,
   )[0];
   const explainedSavings = (
-    data.summary.protectedRevenue +
-    data.summary.potentialWastePrevented
+    data.summary.protectedRevenue + data.summary.potentialWastePrevented
   ).toFixed(0);
 
   return (
@@ -106,7 +107,8 @@ export default function Dashboard() {
             Magic Assistant Summary
           </div>
           <h1 className="mt-4 max-w-2xl text-[20px] font-semibold leading-[1.2] md:text-[24px]">
-            Good morning, Marcus. Your operational health is at {operationalHealth}%.
+            Good morning, Marcus. Your operational health is at{" "}
+            {operationalHealth}%.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-[#c8ddd5]">
             {data.magicSummary.message} HVAS also detected live kitchen usage
@@ -140,10 +142,16 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
-            <button className="rounded-xl bg-[#75f2c1] px-4 py-2.5 text-sm font-semibold text-emerald-darkest">
+            <button
+              onClick={() => navigate("/purchasing")}
+              className="rounded-xl bg-[#75f2c1] px-4 py-2.5 text-sm font-semibold text-emerald-darkest"
+            >
               Apply AI Recommendations
             </button>
-            <button className="rounded-xl border border-white/20 bg-white/6 px-4 py-2.5 text-sm font-medium text-white">
+            <button
+              onClick={() => navigate("/purchasing")}
+              className="rounded-xl border border-white/20 bg-white/6 px-4 py-2.5 text-sm font-medium text-white"
+            >
               View Details
             </button>
           </div>
@@ -162,21 +170,24 @@ export default function Dashboard() {
             </p>
             <div className="mt-4 rounded-xl border border-border bg-[#f8fbf9] p-4">
               <div className="flex items-end gap-1.5">
-                {Object.values(liveSimulation?.actual_orders ?? { a: 2, b: 4, c: 3 }).map(
-                  (value, index) => (
-                    <div
-                      key={index}
-                      className={`flex-1 rounded-t-[4px] ${
-                        index === 4 ? "bg-emerald-dark" : "bg-[#c8d8d2]"
-                      }`}
-                      style={{ height: `${Math.max(24, value * 10)}px` }}
-                    />
-                  ),
-                )}
+                {Object.values(
+                  liveSimulation?.actual_orders ?? { a: 2, b: 4, c: 3 },
+                ).map((value, index) => (
+                  <div
+                    key={index}
+                    className={`flex-1 rounded-t-[4px] ${
+                      index === 4 ? "bg-emerald-dark" : "bg-[#c8d8d2]"
+                    }`}
+                    style={{ height: `${Math.max(24, value * 10)}px` }}
+                  />
+                ))}
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-dark text-white">
+              <button
+                onClick={() => navigate("/simulation")}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-dark text-white"
+              >
                 <Play className="h-4 w-4" />
               </button>
               <div className="text-right">
@@ -300,7 +311,9 @@ export default function Dashboard() {
               <div
                 key={action.id}
                 className={`flex items-start gap-4 px-5 py-5 ${
-                  index !== topActions.length - 1 ? "border-b border-border" : ""
+                  index !== topActions.length - 1
+                    ? "border-b border-border"
+                    : ""
                 }`}
               >
                 <div
@@ -324,10 +337,22 @@ export default function Dashboard() {
                     {action.description}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button className="rounded-lg bg-emerald-dark px-3 py-2 text-xs font-semibold text-white">
-                      {action.type === "PURCHASE_ORDER" ? "Approve Now" : "Review Risk"}
+                    <button
+                      onClick={() =>
+                        action.type === "PURCHASE_ORDER"
+                          ? void approveOrder(action.id)
+                          : navigate("/purchasing")
+                      }
+                      className="rounded-lg bg-emerald-dark px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      {action.type === "PURCHASE_ORDER"
+                        ? "Approve Now"
+                        : "Review Risk"}
                     </button>
-                    <button className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle">
+                    <button
+                      onClick={() => navigate("/purchasing")}
+                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle"
+                    >
                       Edit
                     </button>
                   </div>
@@ -347,7 +372,9 @@ export default function Dashboard() {
 
         <div className="grid gap-5">
           <div className="rounded-2xl border border-border bg-white p-5">
-            <p className="text-sm font-semibold text-heading">Kitchen Throughput</p>
+            <p className="text-sm font-semibold text-heading">
+              Kitchen Throughput
+            </p>
             <div className="mt-4 flex items-end justify-between">
               <span className="text-[34px] font-semibold text-heading">
                 {(
@@ -392,7 +419,11 @@ export default function Dashboard() {
                   Avg absolute skew
                 </p>
                 <p className="mt-2 font-semibold text-heading">
-                  {(liveSimulation?.variance_summary.average_absolute_skew_pct ?? 0).toFixed(1)}%
+                  {(
+                    liveSimulation?.variance_summary
+                      .average_absolute_skew_pct ?? 0
+                  ).toFixed(1)}
+                  %
                 </p>
               </div>
               <div className="rounded-xl bg-[#f6faf8] p-3">
@@ -445,7 +476,10 @@ export default function Dashboard() {
                       {euro(order.totalAmount)}
                     </td>
                     <td className="px-5 py-4">
-                      <button className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-heading">
+                      <button
+                        onClick={() => navigate("/purchasing")}
+                        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-heading"
+                      >
                         Review
                       </button>
                     </td>
@@ -476,7 +510,7 @@ export default function Dashboard() {
                 Forecast error
               </p>
               <p className="mt-2 text-2xl font-semibold text-heading">
-                {(data.evaluation.aggregate.rmse).toFixed(1)}
+                {data.evaluation.aggregate.rmse.toFixed(1)}
               </p>
             </div>
           </div>

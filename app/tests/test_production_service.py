@@ -1,7 +1,6 @@
-import tempfile
+import os
 import unittest
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from sqlalchemy import delete
 
@@ -10,12 +9,13 @@ from app.production_service import ProductionOperationsService
 
 class ProductionOperationsServiceTests(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_path = str(Path(self.temp_dir.name) / "production.sqlite3")
-        self.service = ProductionOperationsService(db_path=self.db_path)
+        self.db_url = os.getenv("TEST_DATABASE_URL")
+        if not self.db_url:
+            self.skipTest("Set TEST_DATABASE_URL to run Postgres-backed production service tests.")
+        self.service = ProductionOperationsService(db_url=self.db_url)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        pass
 
     def _reset_operational_records(self):
         with self.service.engine.begin() as conn:
@@ -35,6 +35,20 @@ class ProductionOperationsServiceTests(unittest.TestCase):
         self.assertIn("blockingIssues", snapshot)
         self.assertIn("sourceTimestamps", snapshot)
         self.assertTrue(snapshot["restaurant"]["id"])
+
+    def test_create_and_authenticate_user(self):
+        user = self.service.create_user(
+            full_name="Alex Chef",
+            email="alex@hvas.test",
+            company_name="HVAS Kitchens",
+            password="supersecure123",
+        )
+        self.assertEqual(user["email"], "alex@hvas.test")
+        authenticated = self.service.authenticate_user(
+            email="alex@hvas.test",
+            password="supersecure123",
+        )
+        self.assertEqual(authenticated["fullName"], "Alex Chef")
 
     def test_sales_import_deduplicates_external_ids(self):
         self._reset_operational_records()
