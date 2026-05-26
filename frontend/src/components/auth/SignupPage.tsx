@@ -48,7 +48,11 @@ export default function SignupPage() {
       await signup({ fullName, companyName, email, password, rememberMe });
       navigate("/overview", { replace: true });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Could not create account.");
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not create account.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -176,10 +180,13 @@ export default function SignupPage() {
             onChange={(event) => setAgreed(event.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border border-border"
           />
-          I agree to the terms, privacy policy, and responsible data processing requirements.
+          I agree to the terms, privacy policy, and responsible data processing
+          requirements.
         </label>
 
-        {error ? <p className="text-sm font-medium text-alert">{error}</p> : null}
+        {error ? (
+          <p className="text-sm font-medium text-alert">{error}</p>
+        ) : null}
 
         <button
           type="submit"

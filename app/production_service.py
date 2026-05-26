@@ -4,9 +4,11 @@ from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from io import StringIO
 import json
+import math
 from math import ceil
 import re
 from typing import Any
+import zlib
 
 import pandas as pd
 from sqlalchemy import (
@@ -256,14 +258,20 @@ class ProductionOperationsService:
             Column("created_at", DateTime(timezone=True), nullable=False),
             Column("updated_at", DateTime(timezone=True), nullable=False),
         )
+        self.app_settings = Table(
+            "app_settings",
+            self.metadata,
+            Column("key", String(120), primary_key=True),
+            Column("value", Text, nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False),
+        )
 
     def _bootstrap_if_empty(self) -> None:
         with self.engine.begin() as conn:
             has_products = conn.execute(select(func.count()).select_from(self.products)).scalar_one()
-        if has_products:
+            has_runs = conn.execute(select(func.count()).select_from(self.advice_runs)).scalar_one()
+        if has_products or has_runs:
             return
-        self._seed_catalog()
-        self._seed_bootstrap_imports()
         self.recompute_advice_snapshot()
 
     def _seed_catalog(self) -> None:
@@ -434,9 +442,10 @@ class ProductionOperationsService:
         return self._serialize_user(user)
 
     def get_restaurant(self) -> dict[str, Any]:
+        restaurant_profile = self._restaurant_profile()
         inventory = self._current_inventory_snapshot()
         return {
-            "restaurant": RESTAURANT_PROFILE,
+            "restaurant": restaurant_profile,
             "generatedAt": utc_timestamp(),
             "inventory": inventory,
             "suppliers": sorted({item["supplierName"] for item in inventory}),
@@ -576,6 +585,15 @@ class ProductionOperationsService:
             raise ValueError(f"Could not parse historical dataset CSV: {err}") from err
 
         frame.columns = [normalize_column_name(str(column)) for column in frame.columns]
+        frame = frame.where(pd.notnull(frame), None)
+
+        if self._is_invoice_dataset(frame):
+            return self._import_invoice_dataset_frame(
+                frame,
+                source_system=source_system,
+                reset_existing=reset_existing,
+            )
+
         required_any = {"product_id", "product_name"}
         missing = []
         if "date" not in frame.columns:
@@ -589,7 +607,6 @@ class ProductionOperationsService:
                 "Historical dataset is missing required columns: " + ", ".join(missing)
             )
 
-        frame = frame.where(pd.notnull(frame), None)
         if reset_existing:
             self._reset_operational_history()
 
@@ -618,7 +635,7 @@ class ProductionOperationsService:
                 )
 
             stock_on_hand = row.get("stock_on_hand")
-            if stock_on_hand is not None and str(stock_on_hand).strip() != "":
+            if not self._is_missing_value(stock_on_hand):
                 count_items.append(
                     {
                         "productId": product_id,
@@ -872,15 +889,366 @@ class ProductionOperationsService:
             conn.execute(delete(self.waste_events))
             conn.execute(delete(self.stock_counts))
 
+    def _reset_catalog(self) -> None:
+        with self.engine.begin() as conn:
+            conn.execute(delete(self.products))
+            conn.execute(delete(self.suppliers))
+            conn.execute(delete(self.app_settings))
+
+    def _restaurant_profile(self) -> dict[str, Any]:
+        profile = dict(RESTAURANT_PROFILE)
+        overrides = self._app_settings()
+        if "restaurant_name" in overrides:
+            profile["name"] = overrides["restaurant_name"]
+        if "restaurant_city" in overrides:
+            profile["location"] = overrides["restaurant_city"]
+        if "restaurant_debtor_number" in overrides:
+            profile["id"] = (
+                f"restaurant-{normalize_column_name(overrides['restaurant_debtor_number'])}"
+            )
+        return profile
+
+    def _app_settings(self) -> dict[str, str]:
+        with self.engine.begin() as conn:
+            rows = conn.execute(select(self.app_settings)).mappings().all()
+        return {str(row["key"]): str(row["value"]) for row in rows}
+
+    def _set_app_setting(self, key: str, value: str) -> None:
+        now = parse_dt(utc_timestamp())
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.app_settings.c.key).where(self.app_settings.c.key == key)
+            ).first()
+            if existing is None:
+                conn.execute(
+                    insert(self.app_settings).values(
+                        key=key,
+                        value=value,
+                        updated_at=now,
+                    )
+                )
+            else:
+                conn.execute(
+                    update(self.app_settings)
+                    .where(self.app_settings.c.key == key)
+                    .values(value=value, updated_at=now)
+                )
+
+    def _is_invoice_dataset(self, frame: pd.DataFrame) -> bool:
+        required = {"invoice_date", "supplier_name", "description"}
+        return required.issubset(set(frame.columns))
+
+    def _import_invoice_dataset_frame(
+        self,
+        frame: pd.DataFrame,
+        *,
+        source_system: str,
+        reset_existing: bool,
+    ) -> dict[str, Any]:
+        if reset_existing:
+            self._reset_operational_history()
+            self._reset_catalog()
+
+        frame = frame.copy()
+        frame = frame[frame["invoice_date"].notna() & frame["description"].notna()].copy()
+        if frame.empty:
+            raise ValueError("Invoice dataset does not contain any invoice rows.")
+
+        frame["invoice_date"] = pd.to_datetime(frame["invoice_date"], errors="coerce")
+        frame = frame[frame["invoice_date"].notna()].copy()
+        if frame.empty:
+            raise ValueError("Invoice dataset does not contain valid invoice dates.")
+
+        coverage_end = date.today()
+        customer_name = next(
+            (
+                str(value).strip()
+                for value in frame.get("customer_name", pd.Series(dtype=object)).tolist()
+                if value and str(value).strip()
+            ),
+            "",
+        )
+        customer_city = next(
+            (
+                str(value).strip()
+                for value in frame.get("customer_city", pd.Series(dtype=object)).tolist()
+                if value and str(value).strip()
+            ),
+            "",
+        )
+        debtor_number = next(
+            (
+                str(value).strip()
+                for value in frame.get("debtor_number", pd.Series(dtype=object)).tolist()
+                if value and str(value).strip()
+            ),
+            "",
+        )
+        if customer_name:
+            self._set_app_setting("restaurant_name", customer_name)
+        if customer_city:
+            self._set_app_setting("restaurant_city", customer_city)
+        if debtor_number:
+            self._set_app_setting("restaurant_debtor_number", debtor_number)
+
+        transformed_rows = self._transform_invoice_dataset(frame, coverage_end=coverage_end)
+        transformed_csv = pd.DataFrame(transformed_rows).to_csv(index=False)
+        return self.import_historical_dataset(
+            transformed_csv,
+            source_system=source_system,
+            reset_existing=False,
+        )
+
+    def _transform_invoice_dataset(
+        self,
+        frame: pd.DataFrame,
+        *,
+        coverage_end: date,
+    ) -> list[dict[str, Any]]:
+        working = frame.copy()
+        working["description"] = working["description"].map(
+            lambda value: str(value).strip() if value is not None else ""
+        )
+        working = working[working["description"] != ""].copy()
+        if working.empty:
+            raise ValueError("Invoice dataset does not contain any valid product descriptions.")
+
+        def read_number(row: dict[str, Any], key: str) -> float:
+            return self._float_value(row.get(key), 0.0)
+
+        receipt_groups: dict[int, dict[str, Any]] = {}
+        for row in working.to_dict(orient="records"):
+            invoice_dt = pd.Timestamp(row["invoice_date"]).date()
+            article_number = str(row.get("article_number") or "").strip()
+            description = str(row.get("description") or "").strip()
+            supplier_name = str(row.get("supplier_name") or "Invoice Supplier").strip()
+            product_key = article_number or description.lower()
+            product_id = self._stable_dataset_product_id(product_key)
+            quantity = read_number(row, "quantity")
+            unit_size = read_number(row, "unit_size") or 1.0
+            total_units = read_number(row, "total_units")
+            received_qty = total_units or (quantity * unit_size) or quantity
+            if received_qty <= 0:
+                continue
+            line_total = read_number(row, "line_total")
+            unit_price = read_number(row, "unit_price")
+            effective_unit_cost = (
+                line_total / received_qty
+                if line_total > 0
+                else unit_price / max(unit_size, 1.0)
+                if unit_price > 0
+                else 0.0
+            )
+            entry = receipt_groups.setdefault(
+                product_id,
+                {
+                    "product_id": product_id,
+                    "product_name": description,
+                    "supplier_name": supplier_name,
+                    "article_number": article_number,
+                    "unit": self._infer_unit_from_description(description),
+                    "category": self._infer_category_from_description(description),
+                    "receipt_by_date": defaultdict(float),
+                    "receipt_events": [],
+                },
+            )
+            entry["receipt_by_date"][invoice_dt] += received_qty
+            entry["receipt_events"].append(
+                {
+                    "date": invoice_dt,
+                    "quantity": received_qty,
+                    "unit_cost": effective_unit_cost,
+                }
+            )
+
+        transformed_rows: list[dict[str, Any]] = []
+        for product in receipt_groups.values():
+            receipt_dates = sorted(product["receipt_by_date"].keys())
+            receipt_quantities = [product["receipt_by_date"][dt] for dt in receipt_dates]
+            average_receipt_qty = sum(receipt_quantities) / len(receipt_quantities)
+            unit_costs = [event["unit_cost"] for event in product["receipt_events"] if event["unit_cost"] > 0]
+            average_unit_cost = round(
+                sum(unit_costs) / len(unit_costs),
+                2,
+            ) if unit_costs else 1.0
+            category = product["category"]
+            selling_price = round(
+                average_unit_cost * self._default_markup_for_category(category),
+                2,
+            )
+            safety_stock = round(max(1.0, average_receipt_qty * 0.35), 1)
+            lead_time_days = self._default_lead_time_days_for_category(category)
+            shelf_life_days = self._default_shelf_life_days_for_category(category)
+            waste_risk_percentage = self._default_waste_risk_percentage_for_category(category)
+            sales_by_date = self._invoice_sales_proxy(
+                product["receipt_by_date"],
+                coverage_end=coverage_end,
+            )
+
+            for sales_date, sales_qty in sales_by_date.items():
+                transformed_rows.append(
+                    {
+                        "date": sales_date.isoformat(),
+                        "product_id": product["product_id"],
+                        "product_name": product["product_name"],
+                        "supplier_name": product["supplier_name"],
+                        "category": category,
+                        "unit": product["unit"],
+                        "cost_price": average_unit_cost,
+                        "selling_price": selling_price,
+                        "safety_stock": safety_stock,
+                        "lead_time_days": lead_time_days,
+                        "shelf_life_days": shelf_life_days,
+                        "waste_risk_percentage": waste_risk_percentage,
+                        "sales_qty": round(sales_qty, 2),
+                        "receipts_qty": round(product["receipt_by_date"].get(sales_date, 0.0), 2),
+                    }
+                )
+
+            latest_stock = 0.0
+            running_stock = 0.0
+            for day in sorted(sales_by_date.keys()):
+                running_stock += product["receipt_by_date"].get(day, 0.0)
+                running_stock = max(0.0, running_stock - sales_by_date.get(day, 0.0))
+                latest_stock = running_stock
+
+            transformed_rows.append(
+                {
+                    "date": coverage_end.isoformat(),
+                    "product_id": product["product_id"],
+                    "product_name": product["product_name"],
+                    "supplier_name": product["supplier_name"],
+                    "category": category,
+                    "unit": product["unit"],
+                    "cost_price": average_unit_cost,
+                    "selling_price": selling_price,
+                    "safety_stock": safety_stock,
+                    "lead_time_days": lead_time_days,
+                    "shelf_life_days": shelf_life_days,
+                    "waste_risk_percentage": waste_risk_percentage,
+                    "stock_on_hand": round(latest_stock, 2),
+                }
+            )
+
+        return transformed_rows
+
+    def _invoice_sales_proxy(
+        self,
+        receipt_by_date: dict[date, float],
+        *,
+        coverage_end: date,
+    ) -> dict[date, float]:
+        sorted_dates = sorted(receipt_by_date.keys())
+        if not sorted_dates:
+            return {}
+
+        sales_by_date: dict[date, float] = defaultdict(float)
+        for index, receipt_date in enumerate(sorted_dates):
+            next_date = (
+                sorted_dates[index + 1]
+                if index + 1 < len(sorted_dates)
+                else coverage_end + timedelta(days=1)
+            )
+            span_days = max(1, (next_date - receipt_date).days)
+            sell_through_qty = receipt_by_date[receipt_date] * 0.88
+            daily_sales = sell_through_qty / span_days
+            for offset in range(span_days):
+                sales_date = receipt_date + timedelta(days=offset)
+                if sales_date > coverage_end:
+                    break
+                sales_by_date[sales_date] += daily_sales
+        return sales_by_date
+
+    def _stable_dataset_product_id(self, product_key: str) -> int:
+        normalized = product_key.strip().lower()
+        return 100_000 + (zlib.crc32(normalized.encode("utf-8")) % 900_000_000)
+
+    def _infer_unit_from_description(self, description: str) -> str:
+        upper = description.upper()
+        if any(token in upper for token in ("LTR", "LITER", "ML", "CL")):
+            return "ltr"
+        if any(token in upper for token in ("KG", "KILO", "GRAM", "GR ")):
+            return "kg"
+        if any(token in upper for token in ("FLES", "BOTTLE", "KRAT", "BLIK")):
+            return "bottle"
+        return "pcs"
+
+    def _infer_category_from_description(self, description: str) -> str:
+        upper = description.upper()
+        keyword_groups = [
+            ("Drinks", ("COLA", "COCA", "FANTA", "SPRITE", "WATER", "SAP", "JUICE", "WINE", "BIER", "KOFFIE", "THEE")),
+            ("Bakery", ("BROOD", "BRIOCHE", "BUN", "BOL", "CROISSANT", "WRAP")),
+            ("Dairy", ("MELK", "CHEESE", "KAAS", "YOG", "BOTER", "ROOM", "MOZZARELLA")),
+            ("Protein", ("HAM", "KIP", "CHICK", "BEEF", "RUND", "BACON", "SALAMI", "TONIJN", "ZALM")),
+            ("Produce", ("TOMAAT", "SLA", "UI", "KOMKOM", "PAPRIKA", "CITROEN", "AVOCADO", "PADDO", "CHAMPIGNON")),
+            ("Frozen", ("FROZEN", "DIEPVRIES", "FRIES", "IJS")),
+            ("Dry Goods", ("PASTA", "RIJST", "MEEL", "SAUS", "MAYO", "SUIKER")),
+        ]
+        for category, keywords in keyword_groups:
+            if any(keyword in upper for keyword in keywords):
+                return category
+        return "Imported"
+
+    def _default_markup_for_category(self, category: str) -> float:
+        return {
+            "Drinks": 3.2,
+            "Bakery": 2.8,
+            "Dairy": 2.5,
+            "Protein": 2.4,
+            "Produce": 2.6,
+            "Frozen": 2.3,
+            "Dry Goods": 2.7,
+            "Imported": 2.5,
+        }.get(category, 2.5)
+
+    def _default_lead_time_days_for_category(self, category: str) -> int:
+        return {
+            "Produce": 1,
+            "Bakery": 1,
+            "Dairy": 2,
+            "Protein": 2,
+            "Drinks": 3,
+            "Frozen": 4,
+            "Dry Goods": 3,
+            "Imported": 2,
+        }.get(category, 2)
+
+    def _default_shelf_life_days_for_category(self, category: str) -> int:
+        return {
+            "Produce": 5,
+            "Bakery": 4,
+            "Dairy": 10,
+            "Protein": 6,
+            "Drinks": 90,
+            "Frozen": 120,
+            "Dry Goods": 120,
+            "Imported": 14,
+        }.get(category, 14)
+
+    def _default_waste_risk_percentage_for_category(self, category: str) -> float:
+        return {
+            "Produce": 24.0,
+            "Bakery": 18.0,
+            "Dairy": 14.0,
+            "Protein": 16.0,
+            "Drinks": 3.0,
+            "Frozen": 5.0,
+            "Dry Goods": 4.0,
+            "Imported": 10.0,
+        }.get(category, 10.0)
+
     def _float_value(self, value: Any, default: float = 0.0) -> float:
-        if value is None or value == "":
+        if self._is_missing_value(value):
             return default
         return float(value)
 
     def _int_value(self, value: Any, default: int) -> int:
-        if value is None or value == "":
+        if self._is_missing_value(value):
             return default
         return int(float(value))
+
+    def _is_missing_value(self, value: Any) -> bool:
+        return value is None or value == "" or (isinstance(value, float) and math.isnan(value))
 
     def _resolve_or_create_dataset_product(self, row: dict[str, Any]) -> int:
         product_id = row.get("product_id")
@@ -1153,74 +1521,170 @@ class ProductionOperationsService:
 
     def _calculate_inventory_positions(self, product_rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
         states: dict[int, dict[str, Any]] = {}
+        product_ids = [int(product["id"]) for product in product_rows]
+        now = datetime.now(UTC)
+
         with self.engine.begin() as conn:
-            for product in product_rows:
-                latest_count = conn.execute(
-                    select(self.stock_counts)
-                    .where(self.stock_counts.c.product_id == product["id"])
-                    .order_by(self.stock_counts.c.counted_at.desc(), self.stock_counts.c.id.desc())
-                    .limit(1)
-                ).mappings().first()
-                if latest_count is None:
-                    states[product["id"]] = {
-                        "currentStock": 0.0,
-                        "countTimestamp": None,
-                        "salesSinceCount": 0.0,
-                        "receiptsSinceCount": 0.0,
-                        "wasteSinceCount": 0.0,
-                        "blocked": ["missing_stock_count"],
-                    }
-                    continue
-                count_time = parse_dt(latest_count["counted_at"])
-                sales_qty = conn.execute(
-                    select(func.coalesce(func.sum(self.sales_transactions.c.quantity), 0.0))
-                    .where(self.sales_transactions.c.product_id == product["id"])
-                    .where(self.sales_transactions.c.sold_at >= count_time)
-                ).scalar_one()
-                receipt_qty = conn.execute(
-                    select(func.coalesce(func.sum(self.inventory_movements.c.quantity_delta), 0.0))
-                    .where(self.inventory_movements.c.product_id == product["id"])
+            count_rows = conn.execute(
+                select(self.stock_counts)
+                .where(self.stock_counts.c.product_id.in_(product_ids))
+                .order_by(
+                    self.stock_counts.c.product_id,
+                    self.stock_counts.c.counted_at.desc(),
+                    self.stock_counts.c.id.desc(),
+                )
+            ).mappings().all()
+
+            latest_counts: dict[int, dict[str, Any]] = {}
+            for row in count_rows:
+                product_id = int(row["product_id"])
+                if product_id not in latest_counts:
+                    latest_counts[product_id] = dict(row)
+
+            counted_products = {
+                product_id: latest_counts[product_id]
+                for product_id in product_ids
+                if product_id in latest_counts
+            }
+            oldest_count_time = None
+            if counted_products:
+                oldest_count_time = min(
+                    parse_dt(row["counted_at"]) for row in counted_products.values()
+                )
+
+            sales_rows = []
+            receipt_rows = []
+            waste_rows = []
+            if oldest_count_time is not None:
+                sales_rows = conn.execute(
+                    select(
+                        self.sales_transactions.c.product_id,
+                        self.sales_transactions.c.sold_at,
+                        self.sales_transactions.c.quantity,
+                    )
+                    .where(self.sales_transactions.c.product_id.in_(counted_products.keys()))
+                    .where(self.sales_transactions.c.sold_at >= oldest_count_time)
+                ).mappings().all()
+                receipt_rows = conn.execute(
+                    select(
+                        self.inventory_movements.c.product_id,
+                        self.inventory_movements.c.moved_at,
+                        self.inventory_movements.c.quantity_delta,
+                    )
+                    .where(self.inventory_movements.c.product_id.in_(counted_products.keys()))
                     .where(self.inventory_movements.c.movement_type == "RECEIPT")
-                    .where(self.inventory_movements.c.moved_at >= count_time)
-                ).scalar_one()
-                waste_qty = conn.execute(
-                    select(func.coalesce(func.sum(self.waste_events.c.quantity), 0.0))
-                    .where(self.waste_events.c.product_id == product["id"])
-                    .where(self.waste_events.c.occurred_at >= count_time)
-                ).scalar_one()
-                current_stock = round(max(0.0, latest_count["quantity"] + receipt_qty - sales_qty - waste_qty), 1)
-                blocked = []
-                if count_time < datetime.now(UTC) - timedelta(days=COUNT_FRESHNESS_DAYS):
-                    blocked.append("stale_stock_count")
-                states[product["id"]] = {
-                    "currentStock": current_stock,
-                    "countTimestamp": count_time,
-                    "salesSinceCount": float(sales_qty),
-                    "receiptsSinceCount": float(receipt_qty),
-                    "wasteSinceCount": float(waste_qty),
-                    "blocked": blocked,
+                    .where(self.inventory_movements.c.moved_at >= oldest_count_time)
+                ).mappings().all()
+                waste_rows = conn.execute(
+                    select(
+                        self.waste_events.c.product_id,
+                        self.waste_events.c.occurred_at,
+                        self.waste_events.c.quantity,
+                    )
+                    .where(self.waste_events.c.product_id.in_(counted_products.keys()))
+                    .where(self.waste_events.c.occurred_at >= oldest_count_time)
+                ).mappings().all()
+
+        sales_since_count: dict[int, float] = defaultdict(float)
+        receipts_since_count: dict[int, float] = defaultdict(float)
+        waste_since_count: dict[int, float] = defaultdict(float)
+
+        for row in sales_rows:
+            product_id = int(row["product_id"])
+            count_time = parse_dt(counted_products[product_id]["counted_at"])
+            sold_at = parse_dt(row["sold_at"])
+            if sold_at is not None and sold_at >= count_time:
+                sales_since_count[product_id] += float(row["quantity"])
+
+        for row in receipt_rows:
+            product_id = int(row["product_id"])
+            count_time = parse_dt(counted_products[product_id]["counted_at"])
+            moved_at = parse_dt(row["moved_at"])
+            if moved_at is not None and moved_at >= count_time:
+                receipts_since_count[product_id] += float(row["quantity_delta"])
+
+        for row in waste_rows:
+            product_id = int(row["product_id"])
+            count_time = parse_dt(counted_products[product_id]["counted_at"])
+            occurred_at = parse_dt(row["occurred_at"])
+            if occurred_at is not None and occurred_at >= count_time:
+                waste_since_count[product_id] += float(row["quantity"])
+
+        for product_id in product_ids:
+            latest_count = latest_counts.get(product_id)
+            if latest_count is None:
+                states[product_id] = {
+                    "currentStock": 0.0,
+                    "countTimestamp": None,
+                    "salesSinceCount": 0.0,
+                    "receiptsSinceCount": 0.0,
+                    "wasteSinceCount": 0.0,
+                    "blocked": ["missing_stock_count"],
                 }
+                continue
+
+            count_time = parse_dt(latest_count["counted_at"])
+            sales_qty = round(sales_since_count.get(product_id, 0.0), 4)
+            receipt_qty = round(receipts_since_count.get(product_id, 0.0), 4)
+            waste_qty = round(waste_since_count.get(product_id, 0.0), 4)
+            current_stock = round(
+                max(0.0, float(latest_count["quantity"]) + receipt_qty - sales_qty - waste_qty),
+                1,
+            )
+            blocked = []
+            if count_time < now - timedelta(days=COUNT_FRESHNESS_DAYS):
+                blocked.append("stale_stock_count")
+            states[product_id] = {
+                "currentStock": current_stock,
+                "countTimestamp": count_time,
+                "salesSinceCount": float(sales_qty),
+                "receiptsSinceCount": float(receipt_qty),
+                "wasteSinceCount": float(waste_qty),
+                "blocked": blocked,
+            }
         return states
 
     def _sales_history_for_product(self, product_id: int) -> list[dict[str, Any]]:
+        return self._sales_history_for_products([product_id]).get(product_id, [])
+
+    def _sales_history_for_products(
+        self,
+        product_ids: list[int],
+    ) -> dict[int, list[dict[str, Any]]]:
+        if not product_ids:
+            return {}
+
         with self.engine.begin() as conn:
             rows = conn.execute(
                 select(
+                    self.sales_transactions.c.product_id,
                     func.date(self.sales_transactions.c.sold_at).label("sales_date"),
                     func.sum(self.sales_transactions.c.quantity).label("quantity_sold"),
                 )
-                .where(self.sales_transactions.c.product_id == product_id)
-                .group_by(func.date(self.sales_transactions.c.sold_at))
-                .order_by(func.date(self.sales_transactions.c.sold_at))
+                .where(self.sales_transactions.c.product_id.in_(product_ids))
+                .group_by(
+                    self.sales_transactions.c.product_id,
+                    func.date(self.sales_transactions.c.sold_at),
+                )
+                .order_by(
+                    self.sales_transactions.c.product_id,
+                    func.date(self.sales_transactions.c.sold_at),
+                )
             ).mappings().all()
-        return [
-            {
-                "productId": product_id,
-                "date": str(row["sales_date"]),
-                "quantitySold": float(row["quantity_sold"]),
-            }
-            for row in rows
-        ]
+
+        history_by_product_id: dict[int, list[dict[str, Any]]] = {
+            product_id: [] for product_id in product_ids
+        }
+        for row in rows:
+            product_id = int(row["product_id"])
+            history_by_product_id.setdefault(product_id, []).append(
+                {
+                    "productId": product_id,
+                    "date": str(row["sales_date"]),
+                    "quantitySold": float(row["quantity_sold"]),
+                }
+            )
+        return history_by_product_id
 
     def _build_snapshot(
         self,
@@ -1450,7 +1914,7 @@ class ProductionOperationsService:
             "lastAdviceRunAt": None,
         }
         snapshot = {
-            "restaurant": RESTAURANT_PROFILE,
+            "restaurant": self._restaurant_profile(),
             "generatedAt": utc_timestamp(),
             "summary": summary,
             "topActions": self._build_top_actions(items, purchase_orders["active"]),

@@ -4,6 +4,7 @@ import { useSimulation } from "../useSimulation";
 import { ErrorState, LoadingState } from "./PageState";
 import ProductionStatusBanner from "./ProductionStatusBanner";
 import { AlertTriangle, Check, ChevronRight, Play, Truck, Zap } from "./Icons";
+import { useAuth } from "../AuthContext";
 
 function euro(value: number) {
   return new Intl.NumberFormat("nl-NL", {
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const { data, liveSimulation, loading, error, refresh, approveOrder } =
     useSimulation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const supplierStats = useMemo(() => {
     if (!data) return [];
@@ -107,8 +109,8 @@ export default function Dashboard() {
             Magic Assistant Summary
           </div>
           <h1 className="mt-4 max-w-2xl text-[20px] font-semibold leading-[1.2] md:text-[24px]">
-            Good morning, Marcus. Your operational health is at{" "}
-            {operationalHealth}%.
+            Good morning, {user?.fullName.split(" ")[0]}. Your operational
+            health is at {operationalHealth}%.
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-[#c8ddd5]">
             {data.magicSummary.message} HVAS also detected live kitchen usage

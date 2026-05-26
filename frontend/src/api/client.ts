@@ -278,6 +278,110 @@ export interface OrderAdviceResponse {
   };
 }
 
+export interface SmartOrderingContextProduct {
+  productId: number;
+  productName: string;
+  category: string;
+  unit: string;
+  supplierId: number | null;
+  supplierName: string | null;
+  currentStock: number;
+  outstandingIncomingQuantity: number;
+  recentUsageDays: number;
+  recentUsageTotal: number;
+  averageDailyUsage: number;
+  minimumStock: number;
+  packageQuantity: number;
+  packageLabel: string;
+  unitCost: number;
+  supplierAvailable: boolean;
+  stockDataStatus: "ok" | "missing" | "stale";
+}
+
+export interface SmartOrderingContextResponse {
+  generatedAt: string;
+  restaurant: RestaurantProfile;
+  suppliers: Array<{
+    supplierId: number;
+    supplierName: string;
+    active: boolean;
+  }>;
+  products: SmartOrderingContextProduct[];
+}
+
+export interface SmartOrderSuggestion {
+  productId: number;
+  productName: string;
+  category: string;
+  unit: string;
+  supplierId: number | null;
+  supplierName: string | null;
+  expectedUsage: number;
+  averageDailyUsage: number;
+  currentStock: number;
+  outstandingIncomingQuantity: number;
+  safetyBuffer: number;
+  requiredQuantity: number;
+  suggestedQuantity: number;
+  packageQuantity: number;
+  packageLabel: string;
+  estimatedLineCost: number;
+  confidenceScore: number;
+  confidence: "low" | "medium" | "high";
+  warnings: Array<
+    | "NO_SUPPLIER_LINKED"
+    | "MISSING_STOCK_DATA"
+    | "LOW_CONFIDENCE"
+    | "PACKAGE_OVER_ORDER"
+    | "BELOW_MINIMUM_STOCK"
+    | "OUT_OF_STOCK"
+    | "SUPPLIER_UNAVAILABLE"
+  >;
+  stockDataStatus: "ok" | "missing" | "stale";
+  supplierAvailable: boolean;
+  minimumStock: number;
+}
+
+export interface SmartOrderingForecastResponse {
+  period: {
+    days: number;
+    start: string;
+    end: string;
+  };
+  summary: {
+    expectedRevenue: number;
+    expectedCovers: number;
+    confidence: "low" | "medium" | "high";
+  };
+  suggestions: SmartOrderSuggestion[];
+}
+
+export interface SmartSupplierOrderLine {
+  productId: number;
+  productName: string;
+  quantity: number;
+  unit: string;
+  supplierId: number | null;
+  supplierName: string;
+  unitCost: number;
+  estimatedLineCost: number;
+  packageQuantity: number;
+  packageLabel: string;
+  warnings: SmartOrderSuggestion["warnings"];
+}
+
+export interface SmartSupplierOrderDraft {
+  draftOrderId: string;
+  supplierId: number | null;
+  supplierName: string;
+  status: string;
+  expectedDeliveryDate: string;
+  deliveryNote: string;
+  estimatedTotalCost: number;
+  totalProducts: number;
+  productLines: SmartSupplierOrderLine[];
+}
+
 export interface InventoryUpdateItem {
   productId: number;
   currentStock: number;
@@ -435,6 +539,81 @@ export async function fetchOrderAdvice(): Promise<OrderAdviceResponse> {
   return res.json();
 }
 
+export async function fetchSmartOrderingContext(): Promise<SmartOrderingContextResponse> {
+  const res = await apiFetch("/api/smart-ordering/context");
+  if (!res.ok)
+    throw new Error(`Failed to fetch smart ordering context: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSmartOrderingForecast(payload: {
+  days: number;
+  includeCurrentStock: boolean;
+  includeOutstandingOrders: boolean;
+}): Promise<SmartOrderingForecastResponse> {
+  const res = await apiFetch("/api/smart-ordering/forecast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(`Failed to fetch smart ordering forecast: ${res.status}`);
+  return res.json();
+}
+
+export async function createSmartOrderDraft(payload: {
+  days: number;
+  includeCurrentStock: boolean;
+  includeOutstandingOrders: boolean;
+  suggestions: Array<{
+    productId: number;
+    accepted: boolean;
+    quantity: number;
+    unit: string;
+    supplierId: number | null;
+  }>;
+}): Promise<{
+  period: {
+    days: number;
+    start: string;
+    end: string;
+  };
+  draftOrders: SmartSupplierOrderDraft[];
+  summary: {
+    supplierCount: number;
+    totalProducts: number;
+    estimatedTotalCost: number;
+  };
+}> {
+  const res = await apiFetch("/api/smart-ordering/order-draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(`Failed to create smart order draft: ${res.status}`);
+  return res.json();
+}
+
+export async function placeSmartOrders(draftOrderIds: string[]): Promise<{
+  placedAt: string;
+  orders: Array<{
+    draftOrderId: string;
+    supplierId: number | null;
+    supplierName: string;
+    status: string;
+    estimatedTotalCost: number;
+  }>;
+}> {
+  const res = await apiFetch("/api/smart-ordering/place-orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ draftOrderIds }),
+  });
+  if (!res.ok) throw new Error(`Failed to place smart orders: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchRestaurant(): Promise<RestaurantResponse> {
   const res = await apiFetch("/api/restaurant");
   if (!res.ok)
@@ -470,8 +649,7 @@ export async function startLiveSimulation(): Promise<LiveSimulationState> {
 
 export async function stopLiveSimulation(): Promise<LiveSimulationState> {
   const res = await apiFetch("/api/live-simulation/stop", { method: "POST" });
-  if (!res.ok)
-    throw new Error(`Failed to stop live simulation: ${res.status}`);
+  if (!res.ok) throw new Error(`Failed to stop live simulation: ${res.status}`);
   return res.json();
 }
 
@@ -524,9 +702,7 @@ export async function rejectPurchaseOrder(
   return res.json();
 }
 
-export async function updateInventory(
-  items: InventoryUpdateItem[],
-): Promise<{
+export async function updateInventory(items: InventoryUpdateItem[]): Promise<{
   success: boolean;
   updated: Record<string, number>;
   importResult: {
@@ -570,13 +746,15 @@ export async function updateProductConfig(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error(`Failed to update product config: ${res.status}`);
+  if (!res.ok)
+    throw new Error(`Failed to update product config: ${res.status}`);
   return res.json();
 }
 
 export async function fetchSupplierConfig(): Promise<SupplierConfigItem[]> {
   const res = await apiFetch("/api/config/suppliers");
-  if (!res.ok) throw new Error(`Failed to fetch supplier config: ${res.status}`);
+  if (!res.ok)
+    throw new Error(`Failed to fetch supplier config: ${res.status}`);
   const payload = (await res.json()) as { items: SupplierConfigItem[] };
   return payload.items;
 }
@@ -590,7 +768,8 @@ export async function updateSupplierConfig(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
   });
-  if (!res.ok) throw new Error(`Failed to update supplier config: ${res.status}`);
+  if (!res.ok)
+    throw new Error(`Failed to update supplier config: ${res.status}`);
   return res.json();
 }
 
@@ -627,7 +806,10 @@ export async function loginUser(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await readErrorMessage(res, `Failed to login: ${res.status}`));
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to login: ${res.status}`),
+    );
   return res.json();
 }
 
@@ -643,7 +825,10 @@ export async function signupUser(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(await readErrorMessage(res, `Failed to sign up: ${res.status}`));
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to sign up: ${res.status}`),
+    );
   return res.json();
 }
 
@@ -654,32 +839,49 @@ export async function logoutUser(): Promise<{ success: boolean }> {
 }
 
 export async function fetchRecipes(): Promise<ApiRecipe[]> {
-  return [];
+  const res = await apiFetch("/api/recipes");
+  if (!res.ok) throw new Error(`Failed to fetch recipes: ${res.status}`);
+  return res.json();
 }
 
 export async function createRecipe(
-  _name: string,
-  _ingredients: { ingredientId: number; quantity: number }[],
+  name: string,
+  ingredients: { ingredientId: number; quantity: number }[],
 ): Promise<{ success: boolean; id: number }> {
-  throw new Error(
-    "Recipe management is not part of this Smart Order Assistant POC.",
-  );
+  const res = await apiFetch("/api/recipes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, ingredients }),
+  });
+  if (!res.ok)
+    throw new Error(await readErrorMessage(res, `Failed to create recipe: ${res.status}`));
+  return res.json();
 }
 
-export async function deleteRecipe(_id: number): Promise<{ success: boolean }> {
-  throw new Error(
-    "Recipe management is not part of this Smart Order Assistant POC.",
-  );
+export async function deleteRecipe(id: number): Promise<{ success: boolean }> {
+  const res = await apiFetch(`/api/recipes/${id}`, { method: "DELETE" });
+  if (!res.ok)
+    throw new Error(await readErrorMessage(res, `Failed to delete recipe: ${res.status}`));
+  return res.json();
 }
 
 export async function fetchIngredients(): Promise<ApiIngredient[]> {
-  return [];
+  const res = await apiFetch("/api/ingredients");
+  if (!res.ok) throw new Error(`Failed to fetch ingredients: ${res.status}`);
+  return res.json();
 }
 
 export async function createIngredient(
-  _name: string,
+  name: string,
 ): Promise<{ success: boolean; id: number }> {
-  throw new Error(
-    "Ingredient management is not part of this Smart Order Assistant POC.",
-  );
+  const res = await apiFetch("/api/ingredients", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to create ingredient: ${res.status}`),
+    );
+  return res.json();
 }

@@ -355,6 +355,9 @@ export default function SettingsPage() {
         <p className="mt-2 max-w-3xl text-sm leading-6 text-body">
           Upload one CSV with daily product history and HVAS will rebuild the
           production dataset, recompute forecasts, and refresh the dashboard.
+          Invoice exports from the PDF parser are also supported: HVAS will
+          derive products, receipts, current stock, and proxy sales history
+          from invoice lines when direct POS history is unavailable.
           Required columns: <code>date</code>, <code>sales_qty</code>, and
           either
           <code> product_id</code> or <code>product_name</code>. Recommended

@@ -1,4 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import {
   fetchAuthSession,
   loginUser,
@@ -11,7 +17,11 @@ interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
   error: string | null;
-  login: (payload: { email: string; password: string; rememberMe?: boolean }) => Promise<void>;
+  login: (payload: {
+    email: string;
+    password: string;
+    rememberMe?: boolean;
+  }) => Promise<void>;
   signup: (payload: {
     fullName: string;
     email: string;
@@ -49,7 +59,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshSession]);
 
   const login = useCallback(
-    async (payload: { email: string; password: string; rememberMe?: boolean }) => {
+    async (payload: {
+      email: string;
+      password: string;
+      rememberMe?: boolean;
+    }) => {
       setError(null);
       const response = await loginUser(payload);
       setUser(response.user);

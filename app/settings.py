@@ -8,6 +8,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 APP_DIR = os.path.dirname(__file__)
 DEFAULT_DATA_DIR = os.path.join(APP_DIR, "data")
+DEFAULT_PRODUCTION_DB_PATH = os.path.join(DEFAULT_DATA_DIR, "production_operations.sqlite3")
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-hvas-secret-key-change-me")
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
@@ -28,22 +29,33 @@ ORDER_ASSISTANT_STATE_PATH = os.getenv("ORDER_ASSISTANT_STATE_PATH", os.path.joi
 
 def _normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
-    if url.startswith("postgresql://") and "+psycopg" not in url:
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return url.replace("postgres://", "postgresql+psycopg2://", 1)
+    if url.startswith("postgresql://") and "+" not in url.partition("://")[0]:
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return url
 
 
 def _postgres_url_from_settings() -> str:
     password = quote_plus(DB_PASSWORD)
     username = quote_plus(DB_USERNAME)
-    return f"postgresql+psycopg://{username}:{password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    return f"postgresql+psycopg2://{username}:{password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+
+def _sqlite_url_from_settings() -> str:
+    return f"sqlite:///{DEFAULT_PRODUCTION_DB_PATH}"
+
+
+def _has_explicit_postgres_settings() -> bool:
+    return any(
+        key in os.environ
+        for key in ("DB_HOST", "DB_PORT", "DB_NAME", "DB_USERNAME", "DB_PASSWORD")
+    )
 
 
 PRODUCTION_DB_URL = _normalize_database_url(
     os.getenv("DATABASE_URL")
     or os.getenv("PRODUCTION_DB_URL")
-    or _postgres_url_from_settings()
+    or (_postgres_url_from_settings() if _has_explicit_postgres_settings() else _sqlite_url_from_settings())
 )
 
 DEFAULT_SIM_CONFIG = {

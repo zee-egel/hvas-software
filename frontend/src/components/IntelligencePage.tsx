@@ -40,7 +40,8 @@ export default function IntelligencePage() {
       );
   }, [data, draftStocks]);
 
-  if (loading && !data) return <LoadingState title="Loading inventory intelligence..." />;
+  if (loading && !data)
+    return <LoadingState title="Loading inventory intelligence..." />;
   if (!data)
     return (
       <ErrorState
@@ -55,7 +56,9 @@ export default function IntelligencePage() {
   const countCritical = data.products.filter(
     (item) => item.currentStock < item.requiredStock,
   ).length;
-  const countWaste = data.products.filter((item) => item.excessStock > 0).length;
+  const countWaste = data.products.filter(
+    (item) => item.excessStock > 0,
+  ).length;
   const totalPotentialWaste = data.products.reduce(
     (sum, item) => sum + item.financialImpact.potentialWasteCost,
     0,
@@ -80,14 +83,24 @@ export default function IntelligencePage() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onClick={() =>
+              filtersRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
             className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-subtitle"
           >
             <Sliders className="h-4 w-4" />
             Filters
           </button>
           <button
-            onClick={() => tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onClick={() =>
+              tableRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
             className="rounded-xl bg-emerald-dark px-4 py-2.5 text-sm font-semibold text-white"
           >
             New Count
@@ -167,8 +180,8 @@ export default function IntelligencePage() {
                   </p>
                   <p className="mt-1 text-xs text-body">
                     Suggested action: review portion control or receive counts.
-                    Learned multiplier {trend.learnedMultiplier.toFixed(2)}x with{" "}
-                    {Math.round(trend.confidence * 100)}% confidence.
+                    Learned multiplier {trend.learnedMultiplier.toFixed(2)}x
+                    with {Math.round(trend.confidence * 100)}% confidence.
                   </p>
                 </div>
               ))}
@@ -222,29 +235,43 @@ export default function IntelligencePage() {
               {changedItems.length || 3} items flagged for high variance.
             </p>
             <div className="mt-4 space-y-2">
-              {(liveSimulation?.variance_summary.low_stock_ingredients ?? [
-                "Ribeye Steak",
-                "Avocados",
-              ]).slice(0, 2).map((item, index) => (
-                <div
-                  key={item}
-                  className="flex items-center justify-between rounded-lg bg-white/6 px-3 py-2 text-sm"
-                >
-                  <span>{item}</span>
-                  <span className="text-[#ff8c82]">
-                    {index === 0 ? "-14%" : "+9%"}
-                  </span>
-                </div>
-              ))}
+              {(
+                liveSimulation?.variance_summary.low_stock_ingredients ?? [
+                  "Ribeye Steak",
+                  "Avocados",
+                ]
+              )
+                .slice(0, 2)
+                .map((item, index) => (
+                  <div
+                    key={item}
+                    className="flex items-center justify-between rounded-lg bg-white/6 px-3 py-2 text-sm"
+                  >
+                    <span>{item}</span>
+                    <span className="text-[#ff8c82]">
+                      {index === 0 ? "-14%" : "+9%"}
+                    </span>
+                  </div>
+                ))}
             </div>
             <button
               onClick={() => {
-                const firstCritical = tableItems.find((i) => i.currentStock < i.requiredStock);
+                const firstCritical = tableItems.find(
+                  (i) => i.currentStock < i.requiredStock,
+                );
                 if (firstCritical) {
-                  document.getElementById(`stock-input-${firstCritical.product.id}`)?.focus();
-                  tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  document
+                    .getElementById(`stock-input-${firstCritical.product.id}`)
+                    ?.focus();
+                  tableRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 } else {
-                  tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  tableRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  });
                 }
               }}
               className="mt-5 w-full rounded-xl bg-[#b9ffd8] px-4 py-2.5 text-sm font-semibold text-emerald-darkest"
@@ -255,7 +282,10 @@ export default function IntelligencePage() {
         </div>
 
         <div className="space-y-4">
-          <section ref={tableRef} className="overflow-hidden rounded-2xl border border-border bg-white">
+          <section
+            ref={tableRef}
+            className="overflow-hidden rounded-2xl border border-border bg-white"
+          >
             <table className="min-w-full text-left">
               <thead>
                 <tr className="text-[11px] uppercase tracking-[0.12em] text-body">
@@ -307,7 +337,11 @@ export default function IntelligencePage() {
                         {item.product.unit}
                       </td>
                       <td className="px-5 py-4 text-sm text-subtitle">
-                        {index === 0 ? "2h ago" : index === 1 ? "1d ago" : "4h ago"}
+                        {index === 0
+                          ? "2h ago"
+                          : index === 1
+                            ? "1d ago"
+                            : "4h ago"}
                         <p className="mt-1 text-xs text-body">
                           lead time {item.product.leadTimeDays}d
                         </p>
@@ -325,19 +359,26 @@ export default function IntelligencePage() {
                             ? `+${item.excessStock.toFixed(1)} ${item.product.unit}`
                             : "Stable"}
                         <p className="mt-1 text-xs text-body">
-                          req. {item.requiredStock.toFixed(1)} {item.product.unit}
+                          req. {item.requiredStock.toFixed(1)}{" "}
+                          {item.product.unit}
                         </p>
                       </td>
                       <td className="px-5 py-4">
                         <button
-                          onClick={() => document.getElementById(`stock-input-${item.product.id}`)?.focus()}
+                          onClick={() =>
+                            document
+                              .getElementById(`stock-input-${item.product.id}`)
+                              ?.focus()
+                          }
                           className={`rounded-lg px-3 py-2 text-xs font-semibold ${
                             item.currentStock < item.requiredStock
                               ? "bg-alert text-white"
-                            : "border border-border bg-white text-heading"
+                              : "border border-border bg-white text-heading"
                           }`}
                         >
-                          {item.currentStock < item.requiredStock ? "Re-count" : "Update"}
+                          {item.currentStock < item.requiredStock
+                            ? "Re-count"
+                            : "Update"}
                         </button>
                       </td>
                     </tr>
@@ -372,31 +413,42 @@ export default function IntelligencePage() {
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-border px-5 py-4 text-sm text-body">
-              <span>Showing {tableItems.length} of {data.products.length} products</span>
+              <span>
+                Showing {tableItems.length} of {data.products.length} products
+              </span>
               <button
                 type="button"
                 onClick={() => void saveInventory(changedItems)}
                 disabled={loading || changedItems.length === 0}
                 className="rounded-xl bg-emerald-dark px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
               >
-                Save {changedItems.length > 0 ? changedItems.length : ""} Updates
+                Save {changedItems.length > 0 ? changedItems.length : ""}{" "}
+                Updates
               </button>
             </div>
           </section>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <button onClick={() => alert('Arrival scanning coming soon.')} className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
+            <button
+              onClick={() => alert("Arrival scanning coming soon.")}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left"
+            >
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#d9fff1] text-emerald-dark">
                 <Package className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-heading">Scan Arrivals</p>
+                <p className="text-sm font-semibold text-heading">
+                  Scan Arrivals
+                </p>
                 <p className="text-sm text-body">
                   Batch import received stock from today&apos;s deliveries.
                 </p>
               </div>
             </button>
-            <button onClick={() => alert('Waste log coming soon.')} className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left">
+            <button
+              onClick={() => alert("Waste log coming soon.")}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-white px-5 py-5 text-left"
+            >
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#fff0ef] text-alert">
                 <Trash className="h-5 w-5" />
               </div>

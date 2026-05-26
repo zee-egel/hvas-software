@@ -7,7 +7,6 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { SimulationProvider } from "./SimulationContext";
-import { useSimulation } from "./useSimulation";
 import { useAuth } from "./AuthContext";
 import Logo from "./components/Logo";
 import {
@@ -29,9 +28,12 @@ import PurchasingPage from "./components/PurchasingPage";
 import SettingsPage from "./components/SettingsPage";
 import LoginPage from "./components/auth/LoginPage";
 import SignupPage from "./components/auth/SignupPage";
+import SmartOrderingPage from "./components/SmartOrderingPage";
 import { LoadingState } from "./components/PageState";
+import { useSimulation } from "./useSimulation";
 
 const navigation = [
+  { to: "/ordering", label: "Smart Ordering", icon: Truck },
   { to: "/overview", label: "Executive Summary", icon: LayoutDashboard },
   { to: "/simulation", label: "Live Simulation", icon: Zap },
   { to: "/purchasing", label: "Purchasing", icon: Truck },
@@ -77,10 +79,10 @@ function ProtectedAppShell() {
 
           <div className="px-3 pb-4">
             <button
-              onClick={() => navigate("/purchasing")}
+              onClick={() => navigate("/ordering")}
               className="w-full rounded-sm bg-emerald-dark px-4 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(13,90,67,0.18)] transition-opacity hover:opacity-90"
             >
-              Create Purchase Order
+              Open Smart Ordering
             </button>
             <div className="mt-5 border-t border-border pt-4">
               <button
@@ -114,6 +116,13 @@ function ProtectedAppShell() {
 
             <div className="ml-6 flex items-center gap-4">
               <button
+                onClick={() => navigate("/ordering")}
+                className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading"
+                title="Smart ordering"
+              >
+                <Truck className="h-4 w-4" />
+              </button>
+              <button
                 onClick={() => navigate("/overview")}
                 className="rounded-full p-2 text-subtitle transition-colors hover:bg-[#f4f7f5] hover:text-heading"
                 title="Notifications"
@@ -146,6 +155,7 @@ function ProtectedAppShell() {
           <main className="px-5 py-6">
             <div className="mx-auto max-w-310">
               <Routes>
+                <Route path="/ordering" element={<SmartOrderingPage />} />
                 <Route path="/overview" element={<Dashboard />} />
                 <Route path="/simulation" element={<LiveSimulationPage />} />
                 <Route path="/purchasing" element={<PurchasingPage />} />
@@ -155,7 +165,7 @@ function ProtectedAppShell() {
                   element={<Navigate to="/intelligence" replace />}
                 />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/overview" replace />} />
+                <Route path="*" element={<Navigate to="/ordering" replace />} />
               </Routes>
             </div>
           </main>

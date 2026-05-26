@@ -15,6 +15,12 @@ try:
     )
     from production_service import ProductionOperationsService
     from simulation_service import InventorySimulationService
+    from smart_ordering.service import SmartOrderingService
+    from smart_ordering.validation import (
+        validate_forecast_request,
+        validate_order_draft_request,
+        validate_place_orders_request,
+    )
 except ImportError:
     from .settings import (
         CSV_DIR,
@@ -27,6 +33,12 @@ except ImportError:
     )
     from .production_service import ProductionOperationsService
     from .simulation_service import InventorySimulationService
+    from .smart_ordering.service import SmartOrderingService
+    from .smart_ordering.validation import (
+        validate_forecast_request,
+        validate_order_draft_request,
+        validate_place_orders_request,
+    )
 
 
 app = Flask(__name__)
@@ -36,6 +48,7 @@ app.config["SESSION_COOKIE_SECURE"] = SESSION_COOKIE_SECURE
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = SESSION_COOKIE_SAMESITE
 order_assistant = ProductionOperationsService(db_url=PRODUCTION_DB_URL)
+smart_ordering = SmartOrderingService(order_assistant)
 live_simulation = InventorySimulationService(csv_dir=CSV_DIR, state_path=STATE_PATH)
 
 
@@ -126,6 +139,49 @@ def get_restaurant():
 @login_required
 def get_order_advice():
     return jsonify(order_assistant.get_order_advice())
+
+
+@app.get("/api/smart-ordering/context")
+@login_required
+def get_smart_ordering_context():
+    return jsonify(smart_ordering.get_context())
+
+
+@app.post("/api/smart-ordering/forecast")
+@login_required
+def create_smart_ordering_forecast():
+    payload = request.get_json() or {}
+    validated = validate_forecast_request(payload)
+    return jsonify(
+        smart_ordering.generate_forecast(
+            days=validated["days"],
+            include_current_stock=validated["includeCurrentStock"],
+            include_outstanding_orders=validated["includeOutstandingOrders"],
+        )
+    )
+
+
+@app.post("/api/smart-ordering/order-draft")
+@login_required
+def create_smart_ordering_order_draft():
+    payload = request.get_json() or {}
+    validated = validate_order_draft_request(payload)
+    return jsonify(
+        smart_ordering.create_order_draft(
+            days=validated["days"],
+            include_current_stock=validated["includeCurrentStock"],
+            include_outstanding_orders=validated["includeOutstandingOrders"],
+            suggestions=validated["suggestions"],
+        )
+    )
+
+
+@app.post("/api/smart-ordering/place-orders")
+@login_required
+def place_smart_ordering_orders():
+    payload = request.get_json() or {}
+    draft_order_ids = validate_place_orders_request(payload)
+    return jsonify(smart_ordering.place_orders(draft_order_ids))
 
 
 @app.get("/api/live-simulation")
@@ -293,6 +349,44 @@ def get_config_suppliers():
 def patch_config_supplier(supplier_id: int):
     payload = request.get_json() or {}
     return jsonify(order_assistant.patch_supplier(supplier_id, payload))
+
+
+@app.get("/api/recipes")
+@login_required
+def get_recipes():
+    return jsonify(live_simulation.get_recipes())
+
+
+@app.post("/api/recipes")
+@login_required
+def create_recipe():
+    payload = request.get_json() or {}
+    name = str(payload.get("name", ""))
+    ingredients = payload.get("ingredients", [])
+    recipe = live_simulation.add_recipe(name, ingredients)
+    return jsonify({"success": True, "id": recipe["id"]})
+
+
+@app.delete("/api/recipes/<int:recipe_id>")
+@login_required
+def delete_recipe(recipe_id: int):
+    live_simulation.delete_recipe(recipe_id)
+    return jsonify({"success": True})
+
+
+@app.get("/api/ingredients")
+@login_required
+def get_ingredients():
+    return jsonify(live_simulation.get_ingredients())
+
+
+@app.post("/api/ingredients")
+@login_required
+def create_ingredient():
+    payload = request.get_json() or {}
+    name = str(payload.get("name", ""))
+    ingredient = live_simulation.add_ingredient(name)
+    return jsonify({"success": True, "id": ingredient["id"]})
 
 
 @app.get("/")
