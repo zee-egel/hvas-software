@@ -13,7 +13,6 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.settings import (
-    CSV_DIR,
     BOOTSTRAP_SAMPLE_DATA,
     FRONTEND_DIST_DIR,
     FRONTEND_ORIGIN,
@@ -21,11 +20,9 @@ from app.settings import (
     SECRET_KEY,
     SESSION_COOKIE_SAMESITE,
     SESSION_COOKIE_SECURE,
-    STATE_PATH,
 )
 from app.production_service import ProductionOperationsService
 from app.scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
-from app.simulation_service import InventorySimulationService
 from app.smart_ordering.service import SmartOrderingService
 from app.smart_ordering.validation import (
     validate_forecast_request,
@@ -46,7 +43,6 @@ order_assistant = ProductionOperationsService(
     bootstrap_sample_data=BOOTSTRAP_SAMPLE_DATA,
 )
 smart_ordering = SmartOrderingService(order_assistant)
-live_simulation = InventorySimulationService(csv_dir=CSV_DIR, state_path=STATE_PATH)
 
 
 def current_user():
@@ -156,13 +152,6 @@ def update_account():
         new_password=payload.get("newPassword"),
     )
     return jsonify({"success": True, "user": updated_user})
-
-
-@app.get("/api/restaurant")
-@login_required
-def get_restaurant():
-    user = current_user()
-    return jsonify(personalize_restaurant_payload(order_assistant.get_restaurant(), user))
 
 
 @app.get("/api/order-advice")
@@ -278,80 +267,11 @@ def place_smart_ordering_orders():
     return jsonify(smart_ordering.place_orders(draft_order_ids))
 
 
-@app.get("/api/live-simulation")
-@login_required
-def get_live_simulation():
-    return jsonify(live_simulation.get_state())
-
-
-@app.post("/api/live-simulation/start")
-@login_required
-def start_live_simulation():
-    return jsonify(live_simulation.start())
-
-
-@app.post("/api/live-simulation/stop")
-@login_required
-def stop_live_simulation():
-    return jsonify(live_simulation.stop())
-
-
-@app.post("/api/live-simulation/tick")
-@login_required
-def tick_live_simulation():
-    return jsonify(live_simulation.tick())
-
-
-@app.post("/api/live-simulation/reset")
-@login_required
-def reset_live_simulation():
-    return jsonify(live_simulation.reset())
-
-
-@app.post("/api/live-simulation/config")
-@login_required
-def update_live_simulation_config():
-    payload = request.get_json() or {}
-    return jsonify(live_simulation.update_config(payload))
-
-
-@app.get("/api/purchase-orders")
-@login_required
-def get_purchase_orders():
-    return jsonify(order_assistant.get_purchase_orders())
-
-
 @app.post("/api/purchase-orders/<purchase_order_id>/approve")
 @login_required
 def approve_purchase_order(purchase_order_id: str):
     snapshot = order_assistant.approve_purchase_order(purchase_order_id)
     return jsonify({"success": True, "snapshot": snapshot})
-
-
-@app.post("/api/purchase-orders/<purchase_order_id>/reject")
-@login_required
-def reject_purchase_order(purchase_order_id: str):
-    snapshot = order_assistant.reject_purchase_order(purchase_order_id)
-    return jsonify({"success": True, "snapshot": snapshot})
-
-
-@app.post("/api/inventory")
-@login_required
-def update_inventory():
-    # Compatibility route for the existing inventory page.
-    payload = request.get_json() or {}
-    items = payload.get("items", [])
-    if not isinstance(items, list) or not items:
-        raise ValueError("Inventory updates require a non-empty items array.")
-    result = order_assistant.update_inventory(items)
-    return jsonify(
-        {
-            "success": True,
-            "updated": result["updated"],
-            "importResult": result["result"],
-            "orderAdvice": order_assistant.get_order_advice(),
-        }
-    )
 
 
 @app.post("/api/import/sales")
@@ -443,44 +363,6 @@ def get_config_suppliers():
 def patch_config_supplier(supplier_id: int):
     payload = request.get_json() or {}
     return jsonify(order_assistant.patch_supplier(supplier_id, payload))
-
-
-@app.get("/api/recipes")
-@login_required
-def get_recipes():
-    return jsonify(live_simulation.get_recipes())
-
-
-@app.post("/api/recipes")
-@login_required
-def create_recipe():
-    payload = request.get_json() or {}
-    name = str(payload.get("name", ""))
-    ingredients = payload.get("ingredients", [])
-    recipe = live_simulation.add_recipe(name, ingredients)
-    return jsonify({"success": True, "id": recipe["id"]})
-
-
-@app.delete("/api/recipes/<int:recipe_id>")
-@login_required
-def delete_recipe(recipe_id: int):
-    live_simulation.delete_recipe(recipe_id)
-    return jsonify({"success": True})
-
-
-@app.get("/api/ingredients")
-@login_required
-def get_ingredients():
-    return jsonify(live_simulation.get_ingredients())
-
-
-@app.post("/api/ingredients")
-@login_required
-def create_ingredient():
-    payload = request.get_json() or {}
-    name = str(payload.get("name", ""))
-    ingredient = live_simulation.add_ingredient(name)
-    return jsonify({"success": True, "id": ingredient["id"]})
 
 
 @app.get("/")

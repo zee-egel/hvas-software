@@ -16,17 +16,11 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 SESSION_COOKIE_SAMESITE = "None" if SESSION_COOKIE_SECURE else "Lax"
 FRONTEND_DIST_DIR = os.getenv("FRONTEND_DIST_DIR", os.path.join(APP_DIR, "frontend_dist"))
 
-HIST_DATA_PATH = os.path.join(os.path.expanduser('~'), 'historical_data.csv')
-SD_WEEKLY_ORDERS = 160
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "prims")
 DB_USERNAME = os.getenv("DB_USERNAME", os.getenv("USER", "postgres"))
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-CSV_DIR = os.getenv("CSV_DIR", os.path.join(APP_DIR, "csv"))
-START_DATE = '2024-01-01'
-STATE_PATH = os.getenv("SIMULATION_STATE_PATH", os.path.join(DEFAULT_DATA_DIR, "simulation_state.json"))
-ORDER_ASSISTANT_STATE_PATH = os.getenv("ORDER_ASSISTANT_STATE_PATH", os.path.join(DEFAULT_DATA_DIR, "order_assistant_state.json"))
 
 def _normalize_database_url(url: str) -> str:
     if url.startswith("postgres://"):

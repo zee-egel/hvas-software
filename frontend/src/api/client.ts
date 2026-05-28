@@ -445,26 +445,6 @@ export interface SmartSupplierOrderDraft {
   productLines: SmartSupplierOrderLine[];
 }
 
-export interface InventoryUpdateItem {
-  productId: number;
-  currentStock: number;
-}
-
-export interface RestaurantResponse {
-  restaurant: RestaurantProfile;
-  generatedAt: string;
-  inventory: Array<{
-    productId: number;
-    productName: string;
-    category: string;
-    unit: string;
-    currentStock: number;
-    supplierName: string;
-  }>;
-  suppliers: string[];
-  contextOutlook: Array<Record<string, unknown>>;
-}
-
 export interface ImportJobStatus {
   id: number;
   importType: string;
@@ -531,69 +511,6 @@ export interface HistoricalDatasetImportResponse {
     } | null;
   };
   snapshot: OrderAdviceResponse;
-}
-
-export interface LiveSimulationConfig {
-  order_variance: number;
-  restock_threshold: number;
-  restock_amount: number;
-  lookback_weeks: number;
-  usage_variance_pct: number;
-  waste_variance_pct: number;
-  learning_rate_pct: number;
-}
-
-export interface LiveSimulationIngredientUsage {
-  ingredientId: number;
-  ingredientName: string;
-  expectedUsage: number;
-  actualUsage: number;
-  learnedMultiplier: number;
-  confidence: number;
-  variancePct: number;
-}
-
-export interface LiveSimulationSummary {
-  average_usage_skew_pct: number;
-  average_absolute_skew_pct: number;
-  most_volatile_ingredient: LiveSimulationIngredientUsage | null;
-  low_stock_ingredients: string[];
-}
-
-export interface LiveSimulationState {
-  predicted_food_orders: Record<string, number>;
-  food_orders_this_week: Record<string, number>;
-  model_accuracy: number[];
-  inventory: Record<string, number>;
-  restocked_ingredients: Record<string, number>;
-  current_week: number;
-  current_time: string;
-  config: LiveSimulationConfig;
-  is_running: boolean;
-  predicted_orders: Record<string, number>;
-  actual_orders: Record<string, number>;
-  accuracy_history: number[];
-  ingredient_usage: LiveSimulationIngredientUsage[];
-  variance_summary: LiveSimulationSummary;
-  recent_events: string[];
-  generated_at: string;
-}
-
-export interface ApiIngredient {
-  id: number;
-  name: string;
-}
-
-export interface ApiRecipeIngredient {
-  ingredientId: number;
-  name: string;
-  quantity: number;
-}
-
-export interface ApiRecipe {
-  id: number;
-  name: string;
-  ingredients: ApiRecipeIngredient[];
 }
 
 export async function fetchOrderAdvice(): Promise<OrderAdviceResponse> {
@@ -677,72 +594,6 @@ export async function placeSmartOrders(draftOrderIds: string[]): Promise<{
   return res.json();
 }
 
-export async function fetchRestaurant(): Promise<RestaurantResponse> {
-  const res = await apiFetch("/api/restaurant");
-  if (!res.ok)
-    throw new Error(`Failed to fetch restaurant snapshot: ${res.status}`);
-  return res.json();
-}
-
-export async function fetchPurchaseOrders(): Promise<{
-  restaurant: RestaurantProfile;
-  generatedAt: string;
-  active: PurchaseOrder[];
-  history: PurchaseOrderHistoryItem[];
-}> {
-  const res = await apiFetch("/api/purchase-orders");
-  if (!res.ok)
-    throw new Error(`Failed to fetch purchase orders: ${res.status}`);
-  return res.json();
-}
-
-export async function fetchLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await apiFetch("/api/live-simulation");
-  if (!res.ok)
-    throw new Error(`Failed to fetch live simulation: ${res.status}`);
-  return res.json();
-}
-
-export async function startLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await apiFetch("/api/live-simulation/start", { method: "POST" });
-  if (!res.ok)
-    throw new Error(`Failed to start live simulation: ${res.status}`);
-  return res.json();
-}
-
-export async function stopLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await apiFetch("/api/live-simulation/stop", { method: "POST" });
-  if (!res.ok) throw new Error(`Failed to stop live simulation: ${res.status}`);
-  return res.json();
-}
-
-export async function tickLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await apiFetch("/api/live-simulation/tick", { method: "POST" });
-  if (!res.ok)
-    throw new Error(`Failed to advance live simulation: ${res.status}`);
-  return res.json();
-}
-
-export async function resetLiveSimulation(): Promise<LiveSimulationState> {
-  const res = await apiFetch("/api/live-simulation/reset", { method: "POST" });
-  if (!res.ok)
-    throw new Error(`Failed to reset live simulation: ${res.status}`);
-  return res.json();
-}
-
-export async function updateLiveSimulationConfig(
-  config: Partial<LiveSimulationConfig>,
-): Promise<LiveSimulationConfig> {
-  const res = await apiFetch("/api/live-simulation/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(config),
-  });
-  if (!res.ok)
-    throw new Error(`Failed to update live simulation config: ${res.status}`);
-  return res.json();
-}
-
 export async function approvePurchaseOrder(
   id: string,
 ): Promise<{ success: boolean; snapshot: OrderAdviceResponse }> {
@@ -751,39 +602,6 @@ export async function approvePurchaseOrder(
   });
   if (!res.ok)
     throw new Error(`Failed to approve purchase order: ${res.status}`);
-  return res.json();
-}
-
-export async function rejectPurchaseOrder(
-  id: string,
-): Promise<{ success: boolean; snapshot: OrderAdviceResponse }> {
-  const res = await apiFetch(`/api/purchase-orders/${id}/reject`, {
-    method: "POST",
-  });
-  if (!res.ok)
-    throw new Error(`Failed to reject purchase order: ${res.status}`);
-  return res.json();
-}
-
-export async function updateInventory(items: InventoryUpdateItem[]): Promise<{
-  success: boolean;
-  updated: Record<string, number>;
-  importResult: {
-    jobId: number;
-    status: string;
-    recordCount: number;
-    acceptedCount: number;
-    rejectedCount: number;
-    errors: Array<{ item: Record<string, unknown>; error: string }>;
-  };
-  orderAdvice: OrderAdviceResponse;
-}> {
-  const res = await apiFetch("/api/inventory", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }),
-  });
-  if (!res.ok) throw new Error(`Failed to update inventory: ${res.status}`);
   return res.json();
 }
 
@@ -980,54 +798,6 @@ export async function uploadDataSetupDocument(
   if (!res.ok)
     throw new Error(
       await readErrorMessage(res, `Failed to upload setup document: ${res.status}`),
-    );
-  return res.json();
-}
-
-export async function fetchRecipes(): Promise<ApiRecipe[]> {
-  const res = await apiFetch("/api/recipes");
-  if (!res.ok) throw new Error(`Failed to fetch recipes: ${res.status}`);
-  return res.json();
-}
-
-export async function createRecipe(
-  name: string,
-  ingredients: { ingredientId: number; quantity: number }[],
-): Promise<{ success: boolean; id: number }> {
-  const res = await apiFetch("/api/recipes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, ingredients }),
-  });
-  if (!res.ok)
-    throw new Error(await readErrorMessage(res, `Failed to create recipe: ${res.status}`));
-  return res.json();
-}
-
-export async function deleteRecipe(id: number): Promise<{ success: boolean }> {
-  const res = await apiFetch(`/api/recipes/${id}`, { method: "DELETE" });
-  if (!res.ok)
-    throw new Error(await readErrorMessage(res, `Failed to delete recipe: ${res.status}`));
-  return res.json();
-}
-
-export async function fetchIngredients(): Promise<ApiIngredient[]> {
-  const res = await apiFetch("/api/ingredients");
-  if (!res.ok) throw new Error(`Failed to fetch ingredients: ${res.status}`);
-  return res.json();
-}
-
-export async function createIngredient(
-  name: string,
-): Promise<{ success: boolean; id: number }> {
-  const res = await apiFetch("/api/ingredients", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok)
-    throw new Error(
-      await readErrorMessage(res, `Failed to create ingredient: ${res.status}`),
     );
   return res.json();
 }

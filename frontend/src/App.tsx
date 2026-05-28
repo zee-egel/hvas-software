@@ -115,7 +115,7 @@ function CommandPalette({
       {
         id: "refresh",
         label: "Refresh workspace data",
-        description: "Sync forecasts, orders, and live simulation",
+        description: "Sync forecasts, orders, and workspace data",
         action: () => onRefresh(),
       },
     ];
