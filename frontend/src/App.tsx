@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import { SimulationProvider } from "./SimulationContext";
 import { useAuth } from "./AuthContext";
+import AccountPage from "./components/AccountPage";
 import Dashboard from "./components/Dashboard";
 import DataSetupPage from "./components/DataSetupPage";
 import {
@@ -64,6 +65,14 @@ const navigation: NavigationItem[] = [
     shortLabel: "Data",
     description: "Improve the digital twin over time",
     icon: Zap,
+    section: "system",
+  },
+  {
+    to: "/account",
+    label: "Account",
+    shortLabel: "Account",
+    description: "Profile and security settings",
+    icon: Settings,
     section: "system",
   },
   {
@@ -202,6 +211,7 @@ function ProtectedAppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   const currentPage =
     pageMeta[location.pathname] ?? pageMeta["/overview"] ?? navigation[0];
@@ -226,6 +236,7 @@ function ProtectedAppShell() {
       if (event.key === "Escape") {
         setCommandOpen(false);
         setMobileSidebarOpen(false);
+        setLogoutConfirmOpen(false);
       }
     }
 
@@ -245,6 +256,44 @@ function ProtectedAppShell() {
         onNavigate={(path) => navigate(path)}
         onRefresh={() => void refresh()}
       />
+
+      {logoutConfirmOpen ? (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-[#0d1311]/28 px-4 backdrop-blur-[3px]">
+          <button
+            type="button"
+            aria-label="Close sign out confirmation"
+            className="absolute inset-0"
+            onClick={() => setLogoutConfirmOpen(false)}
+          />
+          <div className="relative w-full max-w-md rounded-[28px] border border-[rgba(17,24,21,0.08)] bg-white p-6 shadow-[0_30px_80px_rgba(17,24,21,0.16)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a09d]">
+              Sign out
+            </p>
+            <h2 className="mt-3 text-[1.5rem] font-semibold tracking-[-0.03em] text-[#18231f]">
+              Do you really want to sign out?
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[#66716d]">
+              You’ll need to sign in again to return to this workspace.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setLogoutConfirmOpen(false)}
+                className="rounded-full border border-[rgba(17,24,21,0.1)] bg-white px-4 py-2.5 text-sm font-medium text-[#18231f]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="rounded-full bg-[#17342b] px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {mobileSidebarOpen ? (
         <button
@@ -406,7 +455,7 @@ function ProtectedAppShell() {
           <div className="mt-auto space-y-2 px-1">
             <button
               type="button"
-              onClick={() => void logout()}
+              onClick={() => setLogoutConfirmOpen(true)}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm text-[#5f6a65] transition-colors hover:bg-white hover:text-[#17211d]"
             >
               <LogOut className="h-4 w-4 shrink-0" />
@@ -465,7 +514,7 @@ function ProtectedAppShell() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/settings")}
+                  onClick={() => navigate("/account")}
                   className="hidden items-center gap-3 rounded-full border border-[rgba(17,24,21,0.08)] bg-white px-2 py-1.5 shadow-[0_1px_2px_rgba(17,24,21,0.04)] sm:inline-flex"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ecf2ee] text-sm font-semibold text-[#17342b]">
@@ -494,6 +543,7 @@ function ProtectedAppShell() {
                   element={<Navigate to="/ordering" replace />}
                 />
                 <Route path="/data-setup" element={<DataSetupPage />} />
+                <Route path="/account" element={<AccountPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route
                   path="/simulation"

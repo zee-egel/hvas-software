@@ -59,6 +59,34 @@ export interface OnboardingData {
     selectedMethods: string[];
     recommendedMethods: string[];
   };
+  uploadedDocuments?: Array<{
+    name: string;
+    kind: string;
+    uploadedAt: string;
+  }>;
+  normalizedProducts?: NormalizedProductCandidate[];
+  manualStockCounts?: Array<{
+    productName: string;
+    quantity: number;
+    unit?: string;
+  }>;
+  posSetup?: {
+    provider?: string;
+    status?: string;
+  };
+}
+
+export interface NormalizedProductCandidate {
+  originalName: string;
+  normalizedName: string;
+  canonicalName: string;
+  category?: string;
+  unit?: string;
+  packageSize?: string;
+  supplier?: string;
+  confidence: number;
+  sourceDocumentId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AuthSessionResponse {
@@ -873,6 +901,24 @@ export async function logoutUser(): Promise<{ success: boolean }> {
   return res.json();
 }
 
+export async function updateAccount(payload: {
+  fullName?: string;
+  companyName?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}): Promise<{ success: boolean; user: AuthUser }> {
+  const res = await apiFetch("/api/account", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to update account: ${res.status}`),
+    );
+  return res.json();
+}
+
 export async function fetchOnboarding(): Promise<OnboardingStateResponse> {
   const res = await apiFetch("/api/onboarding");
   if (!res.ok) throw new Error(`Failed to fetch onboarding: ${res.status}`);
@@ -908,6 +954,32 @@ export async function resetOnboarding(): Promise<{
   if (!res.ok)
     throw new Error(
       await readErrorMessage(res, `Failed to reset onboarding: ${res.status}`),
+    );
+  return res.json();
+}
+
+export async function uploadDataSetupDocument(
+  file: File,
+  kind: "invoice" | "product-list",
+): Promise<{
+  success: boolean;
+  candidates: NormalizedProductCandidate[];
+  document: {
+    name: string;
+    kind: string;
+    uploadedAt: string;
+  };
+}> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("kind", kind);
+  const res = await apiFetch("/api/data-setup/normalize-products", {
+    method: "POST",
+    body,
+  });
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to upload setup document: ${res.status}`),
     );
   return res.json();
 }

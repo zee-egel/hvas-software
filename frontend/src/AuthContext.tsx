@@ -14,6 +14,7 @@ import {
   type AuthUser,
   type OnboardingData,
   resetOnboarding as resetOnboardingRequest,
+  updateAccount as updateAccountRequest,
 } from "./api/client";
 
 interface AuthContextType {
@@ -39,6 +40,12 @@ interface AuthContextType {
     completed?: boolean;
   }) => Promise<void>;
   resetOnboarding: () => Promise<void>;
+  updateAccount: (payload: {
+    fullName?: string;
+    companyName?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -115,6 +122,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(response.user);
   }, []);
 
+  const updateAccount = useCallback(
+    async (payload: {
+      fullName?: string;
+      companyName?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    }) => {
+      setError(null);
+      const response = await updateAccountRequest(payload);
+      setUser(response.user);
+    },
+    [],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -127,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshSession,
         saveOnboarding,
         resetOnboarding,
+        updateAccount,
       }}
     >
       {children}
@@ -134,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

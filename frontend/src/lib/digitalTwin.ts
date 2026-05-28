@@ -107,14 +107,20 @@ export function getDigitalTwinCompleteness(onboarding: OnboardingData) {
   const selected = onboarding.digitalTwinSetup?.selectedMethods ?? [];
   const hasProducts = onboarding.initialProducts.length > 0;
   const hasSuppliers = onboarding.suppliers.length > 0;
+  const hasUploadedDocs = (onboarding.uploadedDocuments?.length ?? 0) > 0;
+  const hasNormalizedProducts = (onboarding.normalizedProducts?.length ?? 0) > 0;
+  const hasManualStock = (onboarding.manualStockCounts?.length ?? 0) > 0;
+  const hasPosProvider = Boolean(onboarding.posSetup?.provider);
 
   let score = 18;
   if (hasProducts) score += 22;
   if (hasSuppliers) score += 15;
+  if (hasUploadedDocs) score += 10;
+  if (hasNormalizedProducts) score += 12;
   if (selected.includes("Upload recent supplier invoices")) score += 18;
   if (selected.includes("Import product list")) score += 10;
-  if (selected.includes("Connect POS system")) score += 20;
-  if (selected.includes("Enter current stock manually")) score += 12;
+  if (selected.includes("Connect POS system") || hasPosProvider) score += 20;
+  if (selected.includes("Enter current stock manually") || hasManualStock) score += 12;
   if (selected.includes("Start with demo/sample data")) score = Math.max(score, 35);
 
   return Math.min(score, 100);

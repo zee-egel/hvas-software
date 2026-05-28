@@ -1,5 +1,9 @@
 from functools import wraps
+from dataclasses import asdict
 from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 from flask import Flask, jsonify, render_template, request, session
 from flask_cors import CORS
@@ -15,6 +19,7 @@ try:
         STATE_PATH,
     )
     from production_service import ProductionOperationsService
+    from scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
     from simulation_service import InventorySimulationService
     from smart_ordering.service import SmartOrderingService
     from smart_ordering.validation import (
@@ -33,6 +38,7 @@ except ImportError:
         STATE_PATH,
     )
     from .production_service import ProductionOperationsService
+    from .scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
     from .simulation_service import InventorySimulationService
     from .smart_ordering.service import SmartOrderingService
     from .smart_ordering.validation import (
@@ -147,6 +153,21 @@ def logout():
     return jsonify({"success": True})
 
 
+@app.patch("/api/account")
+@login_required
+def update_account():
+    user = current_user()
+    payload = request.get_json() or {}
+    updated_user = order_assistant.update_user(
+        int(user["id"]),
+        full_name=payload.get("fullName"),
+        company_name=payload.get("companyName"),
+        current_password=payload.get("currentPassword"),
+        new_password=payload.get("newPassword"),
+    )
+    return jsonify({"success": True, "user": updated_user})
+
+
 @app.get("/api/restaurant")
 @login_required
 def get_restaurant():
@@ -189,6 +210,39 @@ def reset_onboarding():
     onboarding = order_assistant.reset_user_onboarding(int(user["id"]))
     refreshed_user = order_assistant.get_user_by_id(int(user["id"]))
     return jsonify({"success": True, "user": refreshed_user, "onboarding": onboarding})
+
+
+@app.post("/api/data-setup/normalize-products")
+@login_required
+def normalize_data_setup_products():
+    upload = request.files.get("file")
+    kind = str(request.form.get("kind", "")).strip().lower()
+    if upload is None or not upload.filename:
+        raise ValueError("Document upload requires a file.")
+    if kind not in {"invoice", "product-list"}:
+        raise ValueError("Unsupported document kind.")
+
+    suffix = ""
+    if "." in upload.filename:
+        suffix = "." + upload.filename.rsplit(".", 1)[-1].lower()
+
+    with NamedTemporaryFile(delete=True, suffix=suffix) as temp_file:
+        temp_file.write(upload.read())
+        temp_file.flush()
+        rows = parse_rows_from_file(Path(temp_file.name))
+        candidates = normalize_rows(rows)
+
+    return jsonify(
+        {
+            "success": True,
+            "candidates": [asdict(candidate) for candidate in candidates],
+            "document": {
+                "name": upload.filename,
+                "kind": kind,
+                "uploadedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            },
+        }
+    )
 
 
 @app.get("/api/smart-ordering/context")

@@ -6,7 +6,8 @@ import { stringify } from "csv-stringify/sync";
 import { z } from "zod";
 
 const client = new OpenAI({
-  apiKey: "sk-proj-wat-denk-je-zelf",
+  apiKey:
+    "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",
 });
 
 const InvoiceSchema = z.object({

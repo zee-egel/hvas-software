@@ -484,6 +484,55 @@ class ProductionOperationsService:
             return None
         return self._serialize_user(user)
 
+    def update_user(
+        self,
+        user_id: int,
+        *,
+        full_name: str | None = None,
+        company_name: str | None = None,
+        current_password: str | None = None,
+        new_password: str | None = None,
+    ) -> dict[str, Any]:
+        updates: dict[str, Any] = {}
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.users).where(self.users.c.id == user_id)
+            ).mappings().first()
+            if existing is None:
+                raise ValueError("Account not found.")
+
+            if full_name is not None:
+                cleaned_full_name = full_name.strip()
+                if not cleaned_full_name:
+                    raise ValueError("Full name is required.")
+                updates["full_name"] = cleaned_full_name
+
+            if company_name is not None:
+                cleaned_company_name = company_name.strip()
+                if not cleaned_company_name:
+                    raise ValueError("Company name is required.")
+                updates["company_name"] = cleaned_company_name
+
+            if new_password is not None:
+                if not current_password:
+                    raise ValueError("Current password is required to set a new password.")
+                if not check_password_hash(existing["password_hash"], current_password):
+                    raise ValueError("Current password is incorrect.")
+                if len(new_password) < 8:
+                    raise ValueError("New password must contain at least 8 characters.")
+                updates["password_hash"] = generate_password_hash(new_password)
+
+            if not updates:
+                return self.get_user_by_id(user_id) or self._serialize_user(existing)
+
+            updates["updated_at"] = parse_dt(utc_timestamp())
+            conn.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(**updates)
+            )
+        return self.get_user_by_id(user_id) or {}
+
     def get_user_onboarding(self, user_id: int) -> dict[str, Any]:
         with self.engine.begin() as conn:
             row = conn.execute(
@@ -2368,6 +2417,10 @@ class ProductionOperationsService:
                 "selectedMethods": [],
                 "recommendedMethods": [],
             },
+            "uploadedDocuments": [],
+            "normalizedProducts": [],
+            "manualStockCounts": [],
+            "posSetup": {},
         }
 
     def _normalize_onboarding_data(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -2391,11 +2444,89 @@ class ProductionOperationsService:
 
         location = payload.get("restaurantLocation")
         digital_twin = payload.get("digitalTwinSetup")
+        uploaded_documents = payload.get("uploadedDocuments")
+        normalized_products = payload.get("normalizedProducts")
+        manual_stock_counts = payload.get("manualStockCounts")
+        pos_setup = payload.get("posSetup")
         normalized_location = {
             "city": clean_string(location.get("city")) if isinstance(location, dict) else None,
             "postalCodeOrNeighborhood": clean_string(location.get("postalCodeOrNeighborhood"))
             if isinstance(location, dict)
             else None,
+        }
+
+        normalized_documents: list[dict[str, Any]] = []
+        if isinstance(uploaded_documents, list):
+            for item in uploaded_documents:
+                if not isinstance(item, dict):
+                    continue
+                name = clean_string(item.get("name"))
+                kind = clean_string(item.get("kind"))
+                uploaded_at = clean_string(item.get("uploadedAt"))
+                if not name or not kind:
+                    continue
+                normalized_documents.append(
+                    {
+                        "name": name,
+                        "kind": kind,
+                        "uploadedAt": uploaded_at or utc_timestamp(),
+                    }
+                )
+
+        normalized_product_candidates: list[dict[str, Any]] = []
+        if isinstance(normalized_products, list):
+            for item in normalized_products:
+                if not isinstance(item, dict):
+                    continue
+                original_name = clean_string(item.get("originalName"))
+                normalized_name = clean_string(item.get("normalizedName"))
+                canonical_name = clean_string(item.get("canonicalName"))
+                if not original_name or not normalized_name or not canonical_name:
+                    continue
+                try:
+                    confidence = float(item.get("confidence") or 0.0)
+                except (TypeError, ValueError):
+                    confidence = 0.0
+                normalized_product_candidates.append(
+                    {
+                        "originalName": original_name,
+                        "normalizedName": normalized_name,
+                        "canonicalName": canonical_name,
+                        "category": clean_string(item.get("category")),
+                        "unit": clean_string(item.get("unit")),
+                        "packageSize": clean_string(item.get("packageSize")),
+                        "supplier": clean_string(item.get("supplier")),
+                        "confidence": max(0.0, min(confidence, 1.0)),
+                        "sourceDocumentId": clean_string(item.get("sourceDocumentId")),
+                        "metadata": item.get("metadata")
+                        if isinstance(item.get("metadata"), dict)
+                        else {},
+                    }
+                )
+
+        normalized_stock_counts: list[dict[str, Any]] = []
+        if isinstance(manual_stock_counts, list):
+            for item in manual_stock_counts:
+                if not isinstance(item, dict):
+                    continue
+                product_name = clean_string(item.get("productName"))
+                if not product_name:
+                    continue
+                try:
+                    quantity = float(item.get("quantity") or 0)
+                except (TypeError, ValueError):
+                    quantity = 0.0
+                normalized_stock_counts.append(
+                    {
+                        "productName": product_name,
+                        "quantity": quantity,
+                        "unit": clean_string(item.get("unit")),
+                    }
+                )
+
+        normalized_pos_setup = {
+            "provider": clean_string(pos_setup.get("provider")) if isinstance(pos_setup, dict) else None,
+            "status": clean_string(pos_setup.get("status")) if isinstance(pos_setup, dict) else None,
         }
 
         return {
@@ -2418,6 +2549,10 @@ class ProductionOperationsService:
                     digital_twin.get("recommendedMethods") if isinstance(digital_twin, dict) else [],
                 ),
             },
+            "uploadedDocuments": normalized_documents,
+            "normalizedProducts": normalized_product_candidates,
+            "manualStockCounts": normalized_stock_counts,
+            "posSetup": normalized_pos_setup,
         }
 
     def _serialize_onboarding(self, row: Any) -> dict[str, Any]:
