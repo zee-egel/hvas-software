@@ -6,10 +6,7 @@ import math
 import random
 from typing import Any
 
-try:
-    from data.normalized_product_catalog import PRODUCT_CATALOG
-except ImportError:
-    from .normalized_product_catalog import PRODUCT_CATALOG
+from .normalized_product_catalog import PRODUCT_CATALOG
 
 
 WEEKDAY_MULTIPLIERS = {

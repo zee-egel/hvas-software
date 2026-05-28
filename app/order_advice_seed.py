@@ -5,10 +5,7 @@ import math
 import random
 from typing import Any
 
-try:
-    from data.normalized_product_catalog import PRODUCT_CATALOG
-except ImportError:
-    from .data.normalized_product_catalog import PRODUCT_CATALOG
+from app.data.normalized_product_catalog import PRODUCT_CATALOG
 
 
 WEEKDAY_MULTIPLIERS = {

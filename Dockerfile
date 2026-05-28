@@ -26,6 +26,7 @@ COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY app ./app
+COPY frontend/hvas-products-normalized.csv ./frontend/hvas-products-normalized.csv
 COPY --from=frontend-builder /frontend/dist ./app/frontend_dist
 
 EXPOSE 8080

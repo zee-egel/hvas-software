@@ -9,18 +9,11 @@ from typing import Any
 
 import pandas as pd
 
-try:
-    from order_advice_seed import (
-        PRODUCT_CATALOG,
-        generate_initial_inventory,
-        generate_sales_history,
-    )
-except ImportError:
-    from .order_advice_seed import (
-        PRODUCT_CATALOG,
-        generate_initial_inventory,
-        generate_sales_history,
-    )
+from app.order_advice_seed import (
+    PRODUCT_CATALOG,
+    generate_initial_inventory,
+    generate_sales_history,
+)
 
 
 PURCHASE_ORDER_STATUSES = {

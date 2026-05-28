@@ -32,26 +32,19 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from werkzeug.security import check_password_hash, generate_password_hash
 
-try:
-    from data.restaurant_simulation import RESTAURANT_PROFILE
-    from data.normalized_product_catalog import catalog_fingerprint
-    from order_advice_seed import PRODUCT_CATALOG, generate_initial_inventory, generate_sales_history
-    from order_advice_service import (
-        build_explanation,
-        calculate_financial_impact,
-        calculate_forecast,
-        calculate_reorder_quantity,
-    )
-except ImportError:
-    from .data.restaurant_simulation import RESTAURANT_PROFILE
-    from .data.normalized_product_catalog import catalog_fingerprint
-    from .order_advice_seed import PRODUCT_CATALOG, generate_initial_inventory, generate_sales_history
-    from .order_advice_service import (
-        build_explanation,
-        calculate_financial_impact,
-        calculate_forecast,
-        calculate_reorder_quantity,
-    )
+from app.data.restaurant_simulation import RESTAURANT_PROFILE
+from app.data.normalized_product_catalog import catalog_fingerprint
+from app.order_advice_seed import (
+    PRODUCT_CATALOG,
+    generate_initial_inventory,
+    generate_sales_history,
+)
+from app.order_advice_service import (
+    build_explanation,
+    calculate_financial_impact,
+    calculate_forecast,
+    calculate_reorder_quantity,
+)
 
 
 PURCHASE_ORDER_OPEN_STATUSES = {"DRAFT", "NEEDS_REVIEW"}

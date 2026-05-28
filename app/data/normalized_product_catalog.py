@@ -8,11 +8,24 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-NORMALIZED_PRODUCTS_CSV = REPO_ROOT / "frontend" / "hvas-products-normalized.csv"
+NORMALIZED_PRODUCTS_CSV_CANDIDATES = (
+    REPO_ROOT / "frontend" / "hvas-products-normalized.csv",
+    REPO_ROOT / "hvas-products-normalized.csv",
+)
+
+
+def _normalized_products_csv_path() -> Path:
+    for candidate in NORMALIZED_PRODUCTS_CSV_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    searched = ", ".join(str(path) for path in NORMALIZED_PRODUCTS_CSV_CANDIDATES)
+    raise FileNotFoundError(
+        f"Could not find hvas-products-normalized.csv. Checked: {searched}"
+    )
 
 
 def _read_rows() -> list[dict[str, str]]:
-    with NORMALIZED_PRODUCTS_CSV.open(newline="", encoding="utf-8") as handle:
+    with _normalized_products_csv_path().open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
 
 
