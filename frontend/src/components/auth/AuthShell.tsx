@@ -62,12 +62,19 @@ export default function AuthShell({
           </div>
         </section>
 
-        <aside className="relative hidden overflow-hidden bg-[#123c31] lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:justify-center">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(77,140,118,0.45),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(48,92,76,0.55),transparent_32%),linear-gradient(180deg,#18483a_0%,#123c31_100%)]" />
-          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)]" />
+        <aside
+          className="relative hidden overflow-hidden bg-[#123c31] lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:justify-center"
+          style={{
+            backgroundImage: "url('/login-background.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,28,23,0.38)_0%,rgba(10,28,23,0.54)_52%,rgba(10,28,23,0.74)_100%)]" />
+          <div className="absolute inset-0 opacity-12 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)]" />
 
-          <div className="relative z-10 flex w-full max-w-170 flex-col items-center px-12 text-center text-white">
-            <div className="aspect-16/10 w-full overflow-hidden rounded-4xl border border-white/15 bg-white/8 shadow-[0_30px_80px_rgba(8,24,19,0.22)] backdrop-blur-[2px]">
+          <div className="relative z-10 flex w-full flex-col items-center px-12 text-center text-white">
+            <div className="aspect-16/10 w-full overflow-hidden rounded-4xl border border-white/15 bg-white/10 shadow-[0_36px_100px_rgba(8,24,19,0.28)] backdrop-blur-[2px]">
               <img
                 src="/hvas-dashboard.png"
                 alt="HVAS dashboard preview"
