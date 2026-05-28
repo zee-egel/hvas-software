@@ -36,6 +36,29 @@ export interface AuthUser {
   companyName: string;
   role: string;
   initials: string;
+  onboardingCompleted: boolean;
+  onboardingData: OnboardingData;
+  onboardingCompletedAt?: string | null;
+  workspaceMode: "starter" | "live";
+}
+
+export interface OnboardingData {
+  restaurantType?: string;
+  acquisitionSource?: string;
+  orderingDecisionStyle?: string;
+  orderingFrequency?: string;
+  initialProducts: string[];
+  suppliers: string[];
+  forecastingSignals: string[];
+  restaurantLocation?: {
+    city?: string;
+    postalCodeOrNeighborhood?: string;
+  };
+  primaryGoal?: string;
+  digitalTwinSetup?: {
+    selectedMethods: string[];
+    recommendedMethods: string[];
+  };
 }
 
 export interface AuthSessionResponse {
@@ -43,8 +66,15 @@ export interface AuthSessionResponse {
   user: AuthUser | null;
 }
 
+export interface OnboardingStateResponse {
+  onboardingCompleted: boolean;
+  onboardingData: OnboardingData;
+  completedAt?: string | null;
+}
+
 export interface Product {
   id: number;
+  productCode?: string;
   name: string;
   unit: string;
   costPrice: number;
@@ -95,6 +125,7 @@ export interface InfluencingFactor {
 
 export interface PurchaseOrderLine {
   productId: number;
+  productCode?: string;
   productName: string;
   quantity: number;
   unit: string;
@@ -150,6 +181,7 @@ export interface TodayAction {
 export interface OrderAdviceItem {
   id: string;
   productId: number;
+  productCode?: string;
   productName: string;
   category: string;
   unit: string;
@@ -280,6 +312,7 @@ export interface OrderAdviceResponse {
 
 export interface SmartOrderingContextProduct {
   productId: number;
+  productCode: string;
   productName: string;
   category: string;
   unit: string;
@@ -311,6 +344,7 @@ export interface SmartOrderingContextResponse {
 
 export interface SmartOrderSuggestion {
   productId: number;
+  productCode: string;
   productName: string;
   category: string;
   unit: string;
@@ -358,6 +392,7 @@ export interface SmartOrderingForecastResponse {
 
 export interface SmartSupplierOrderLine {
   productId: number;
+  productCode: string;
   productName: string;
   quantity: number;
   unit: string;
@@ -835,6 +870,45 @@ export async function signupUser(payload: {
 export async function logoutUser(): Promise<{ success: boolean }> {
   const res = await apiFetch("/api/auth/logout", { method: "POST" });
   if (!res.ok) throw new Error(`Failed to logout: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchOnboarding(): Promise<OnboardingStateResponse> {
+  const res = await apiFetch("/api/onboarding");
+  if (!res.ok) throw new Error(`Failed to fetch onboarding: ${res.status}`);
+  return res.json();
+}
+
+export async function saveOnboarding(payload: {
+  data: OnboardingData;
+  completed?: boolean;
+}): Promise<{
+  success: boolean;
+  user: AuthUser;
+  onboarding: OnboardingStateResponse;
+}> {
+  const res = await apiFetch("/api/onboarding", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to save onboarding: ${res.status}`),
+    );
+  return res.json();
+}
+
+export async function resetOnboarding(): Promise<{
+  success: boolean;
+  user: AuthUser;
+  onboarding: OnboardingStateResponse;
+}> {
+  const res = await apiFetch("/api/onboarding/reset", { method: "POST" });
+  if (!res.ok)
+    throw new Error(
+      await readErrorMessage(res, `Failed to reset onboarding: ${res.status}`),
+    );
   return res.json();
 }
 

@@ -34,6 +34,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 try:
     from data.restaurant_simulation import RESTAURANT_PROFILE
+    from data.normalized_product_catalog import catalog_fingerprint
     from order_advice_seed import PRODUCT_CATALOG, generate_initial_inventory, generate_sales_history
     from order_advice_service import (
         build_explanation,
@@ -43,6 +44,7 @@ try:
     )
 except ImportError:
     from .data.restaurant_simulation import RESTAURANT_PROFILE
+    from .data.normalized_product_catalog import catalog_fingerprint
     from .order_advice_seed import PRODUCT_CATALOG, generate_initial_inventory, generate_sales_history
     from .order_advice_service import (
         build_explanation,
@@ -110,6 +112,7 @@ class ProductionOperationsService:
         self.metadata = MetaData()
         self._define_tables()
         self.metadata.create_all(self.engine)
+        self._sync_seed_catalog_if_needed()
         self._bootstrap_if_empty()
 
     def _define_tables(self) -> None:
@@ -258,6 +261,16 @@ class ProductionOperationsService:
             Column("created_at", DateTime(timezone=True), nullable=False),
             Column("updated_at", DateTime(timezone=True), nullable=False),
         )
+        self.user_onboarding = Table(
+            "user_onboarding",
+            self.metadata,
+            Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
+            Column("completed", Boolean, nullable=False, default=False),
+            Column("data_json", Text, nullable=False, default="{}"),
+            Column("created_at", DateTime(timezone=True), nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False),
+            Column("completed_at", DateTime(timezone=True)),
+        )
         self.app_settings = Table(
             "app_settings",
             self.metadata,
@@ -272,6 +285,26 @@ class ProductionOperationsService:
             has_runs = conn.execute(select(func.count()).select_from(self.advice_runs)).scalar_one()
         if has_products or has_runs:
             return
+        self.recompute_advice_snapshot()
+
+    def _sync_seed_catalog_if_needed(self) -> None:
+        expected_fingerprint = catalog_fingerprint(PRODUCT_CATALOG)
+        current_settings = self._app_settings()
+        current_fingerprint = current_settings.get("seed_catalog_fingerprint")
+
+        with self.engine.begin() as conn:
+            current_product_count = conn.execute(
+                select(func.count()).select_from(self.products)
+            ).scalar_one()
+
+        if current_fingerprint == expected_fingerprint and current_product_count == len(PRODUCT_CATALOG):
+            return
+
+        self._reset_operational_history()
+        self._reset_catalog()
+        self._seed_catalog()
+        self._seed_bootstrap_imports()
+        self._set_app_setting("seed_catalog_fingerprint", expected_fingerprint)
         self.recompute_advice_snapshot()
 
     def _seed_catalog(self) -> None:
@@ -420,13 +453,23 @@ class ProductionOperationsService:
                 )
             )
             user_id = int(result.inserted_primary_key[0])
+            conn.execute(
+                insert(self.user_onboarding).values(
+                    user_id=user_id,
+                    completed=False,
+                    data_json=json.dumps(self._default_onboarding_data()),
+                    created_at=now,
+                    updated_at=now,
+                    completed_at=None,
+                )
+            )
         return self.get_user_by_id(user_id)
 
     def authenticate_user(self, email: str, password: str) -> dict[str, Any]:
         normalized_email = email.strip().lower()
         with self.engine.begin() as conn:
             user = conn.execute(
-                select(self.users).where(func.lower(self.users.c.email) == normalized_email)
+                self._user_select().where(func.lower(self.users.c.email) == normalized_email)
             ).mappings().first()
         if user is None or not check_password_hash(user["password_hash"], password):
             raise ValueError("Invalid email or password.")
@@ -435,11 +478,67 @@ class ProductionOperationsService:
     def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
         with self.engine.begin() as conn:
             user = conn.execute(
-                select(self.users).where(self.users.c.id == user_id)
+                self._user_select().where(self.users.c.id == user_id)
             ).mappings().first()
         if user is None:
             return None
         return self._serialize_user(user)
+
+    def get_user_onboarding(self, user_id: int) -> dict[str, Any]:
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(self.user_onboarding).where(self.user_onboarding.c.user_id == user_id)
+            ).mappings().first()
+        if row is None:
+            return {
+                "onboardingCompleted": False,
+                "onboardingData": self._default_onboarding_data(),
+            }
+        return self._serialize_onboarding(row)
+
+    def save_user_onboarding(
+        self,
+        user_id: int,
+        onboarding_data: dict[str, Any] | None,
+        completed: bool | None = None,
+    ) -> dict[str, Any]:
+        now = parse_dt(utc_timestamp())
+        normalized = self._normalize_onboarding_data(onboarding_data or {})
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                select(self.user_onboarding).where(self.user_onboarding.c.user_id == user_id)
+            ).mappings().first()
+            next_completed = bool(completed) if completed is not None else bool(
+                existing["completed"] if existing is not None else False
+            )
+            values = {
+                "completed": next_completed,
+                "data_json": json.dumps(normalized),
+                "updated_at": now,
+                "completed_at": now if next_completed else None,
+            }
+            if existing is None:
+                conn.execute(
+                    insert(self.user_onboarding).values(
+                        user_id=user_id,
+                        created_at=now,
+                        **values,
+                    )
+                )
+            else:
+                conn.execute(
+                    update(self.user_onboarding)
+                    .where(self.user_onboarding.c.user_id == user_id)
+                    .values(**values)
+                )
+        return self.get_user_onboarding(user_id)
+
+    def reset_user_onboarding(self, user_id: int) -> dict[str, Any]:
+        return self.save_user_onboarding(
+            user_id=user_id,
+            onboarding_data=self._default_onboarding_data(),
+            completed=False,
+        )
 
     def get_restaurant(self) -> dict[str, Any]:
         restaurant_profile = self._restaurant_profile()
@@ -712,6 +811,7 @@ class ProductionOperationsService:
             {
                 "id": row["id"],
                 "name": row["name"],
+                "productCode": normalize_column_name(row["name"]),
                 "unit": row["unit"],
                 "category": row["category"],
                 "costPrice": row["cost_price"],
@@ -1795,6 +1895,7 @@ class ProductionOperationsService:
             product_item = {
                 "id": f"advice-{product['id']}",
                 "productId": product["id"],
+                "productCode": normalize_column_name(product["name"]),
                 "productName": product["name"],
                 "category": product["category"],
                 "unit": product["unit"],
@@ -1826,6 +1927,7 @@ class ProductionOperationsService:
                 "forecastHorizonDays": forecast["horizonDays"],
                 "product": {
                     "id": product["id"],
+                    "productCode": normalize_column_name(product["name"]),
                     "name": product["name"],
                     "unit": product["unit"],
                     "costPrice": product["cost_price"],
@@ -2250,7 +2352,116 @@ class ProductionOperationsService:
             return "missing"
         return "fresh" if timestamp >= datetime.now(UTC) - timedelta(days=max_age_days) else "stale"
 
+    def _default_onboarding_data(self) -> dict[str, Any]:
+        return {
+            "initialProducts": [],
+            "suppliers": [],
+            "forecastingSignals": [
+                "Weather",
+                "Day of the week",
+                "Holidays",
+                "Seasonality",
+                "Supplier lead times",
+            ],
+            "restaurantLocation": {},
+            "digitalTwinSetup": {
+                "selectedMethods": [],
+                "recommendedMethods": [],
+            },
+        }
+
+    def _normalize_onboarding_data(self, payload: dict[str, Any]) -> dict[str, Any]:
+        defaults = self._default_onboarding_data()
+
+        def clean_string(value: Any) -> str | None:
+            if value is None:
+                return None
+            text = str(value).strip()
+            return text or None
+
+        def clean_string_list(values: Any) -> list[str]:
+            if not isinstance(values, list):
+                return []
+            cleaned: list[str] = []
+            for value in values:
+                text = clean_string(value)
+                if text and text not in cleaned:
+                    cleaned.append(text)
+            return cleaned
+
+        location = payload.get("restaurantLocation")
+        digital_twin = payload.get("digitalTwinSetup")
+        normalized_location = {
+            "city": clean_string(location.get("city")) if isinstance(location, dict) else None,
+            "postalCodeOrNeighborhood": clean_string(location.get("postalCodeOrNeighborhood"))
+            if isinstance(location, dict)
+            else None,
+        }
+
+        return {
+            "restaurantType": clean_string(payload.get("restaurantType")),
+            "acquisitionSource": clean_string(payload.get("acquisitionSource")),
+            "orderingDecisionStyle": clean_string(payload.get("orderingDecisionStyle")),
+            "orderingFrequency": clean_string(payload.get("orderingFrequency")),
+            "initialProducts": clean_string_list(payload.get("initialProducts"))
+            or defaults["initialProducts"],
+            "suppliers": clean_string_list(payload.get("suppliers")) or defaults["suppliers"],
+            "forecastingSignals": clean_string_list(payload.get("forecastingSignals"))
+            or defaults["forecastingSignals"],
+            "restaurantLocation": normalized_location,
+            "primaryGoal": clean_string(payload.get("primaryGoal")),
+            "digitalTwinSetup": {
+                "selectedMethods": clean_string_list(
+                    digital_twin.get("selectedMethods") if isinstance(digital_twin, dict) else [],
+                ),
+                "recommendedMethods": clean_string_list(
+                    digital_twin.get("recommendedMethods") if isinstance(digital_twin, dict) else [],
+                ),
+            },
+        }
+
+    def _serialize_onboarding(self, row: Any) -> dict[str, Any]:
+        payload = self._default_onboarding_data()
+        try:
+            payload.update(self._normalize_onboarding_data(json.loads(row["data_json"] or "{}")))
+        except (TypeError, json.JSONDecodeError):
+            pass
+        return {
+            "onboardingCompleted": bool(row["completed"]),
+            "onboardingData": payload,
+            "completedAt": dt_to_iso(row["completed_at"]),
+        }
+
+    def _user_select(self):
+        return (
+            select(
+                self.users.c.id,
+                self.users.c.full_name,
+                self.users.c.email,
+                self.users.c.company_name,
+                self.users.c.password_hash,
+                self.users.c.role,
+                self.user_onboarding.c.completed.label("onboarding_completed"),
+                self.user_onboarding.c.data_json.label("onboarding_data_json"),
+                self.user_onboarding.c.completed_at.label("onboarding_completed_at"),
+            )
+            .select_from(
+                self.users.outerjoin(
+                    self.user_onboarding,
+                    self.user_onboarding.c.user_id == self.users.c.id,
+                )
+            )
+        )
+
     def _serialize_user(self, user: Any) -> dict[str, Any]:
+        onboarding_payload = self._default_onboarding_data()
+        try:
+            if user.get("onboarding_data_json"):
+                onboarding_payload.update(
+                    self._normalize_onboarding_data(json.loads(user["onboarding_data_json"]))
+                )
+        except (TypeError, json.JSONDecodeError):
+            pass
         return {
             "id": int(user["id"]),
             "fullName": user["full_name"],
@@ -2258,4 +2469,8 @@ class ProductionOperationsService:
             "companyName": user["company_name"],
             "role": user["role"],
             "initials": "".join(part[:1].upper() for part in user["full_name"].split()[:2]) or "HV",
+            "onboardingCompleted": bool(user.get("onboarding_completed")),
+            "onboardingData": onboarding_payload,
+            "onboardingCompletedAt": dt_to_iso(user.get("onboarding_completed_at")),
+            "workspaceMode": "starter",
         }

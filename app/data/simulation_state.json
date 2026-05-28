@@ -1,5 +1,5 @@
 {
-  "current_week": 9,
+  "current_week": 5,
   "config": {
     "order_variance": 18,
     "restock_threshold": 1200,
@@ -9,107 +9,21 @@
     "waste_variance_pct": 3,
     "learning_rate_pct": 22
   },
-  "accuracy_history": [
-    66.67,
-    50.0,
-    0.0,
-    50.0
-  ],
-  "generated_orders": [
-    {
-      "week": 5,
-      "recipe_id": 1,
-      "num_orders": 3
-    },
-    {
-      "week": 6,
-      "recipe_id": 1,
-      "num_orders": 2
-    },
-    {
-      "week": 7,
-      "recipe_id": 1,
-      "num_orders": 1
-    },
-    {
-      "week": 8,
-      "recipe_id": 1,
-      "num_orders": 2
-    }
-  ],
+  "accuracy_history": [],
+  "generated_orders": [],
   "last_tick": {
-    "predicted_food_orders": {
-      "Pasta": 1
-    },
-    "food_orders_this_week": {
-      "Pasta": 2
-    },
+    "predicted_food_orders": {},
+    "food_orders_this_week": {},
     "restocked_ingredients": {},
-    "ingredient_usage": [
-      {
-        "ingredientId": 4,
-        "ingredientName": "basil",
-        "expectedUsage": 2.0,
-        "actualUsage": 2.24,
-        "learnedMultiplier": 1.056,
-        "confidence": 0.5,
-        "variancePct": 11.8
-      },
-      {
-        "ingredientId": 3,
-        "ingredientName": "cheese",
-        "expectedUsage": 4.0,
-        "actualUsage": 4.43,
-        "learnedMultiplier": 1.012,
-        "confidence": 0.5,
-        "variancePct": 10.8
-      },
-      {
-        "ingredientId": 1,
-        "ingredientName": "tomato",
-        "expectedUsage": 8.0,
-        "actualUsage": 8.34,
-        "learnedMultiplier": 1.058,
-        "confidence": 0.5,
-        "variancePct": 4.2
-      },
-      {
-        "ingredientId": 2,
-        "ingredientName": "spaghetti",
-        "expectedUsage": 2.0,
-        "actualUsage": 1.94,
-        "learnedMultiplier": 1.003,
-        "confidence": 0.5,
-        "variancePct": -3.1
-      }
-    ],
-    "recent_events": [
-      "basil ran 11.8% above recipe expectation."
-    ]
+    "ingredient_usage": [],
+    "recent_events": []
   },
   "inventory_levels": {
-    "1": 6518.3404757197795,
-    "2": 1632.691437858521,
-    "3": 3272.0719978927486,
-    "4": 1631.2281893374154
+    "1": 6447.487390756996,
+    "2": 1615.2879672794909,
+    "3": 3240.2771528566054,
+    "4": 1613.0976034758694
   },
-  "usage_profiles": {
-    "1:1": {
-      "learned_multiplier": 1.0581300401782812,
-      "observations": 4.0
-    },
-    "1:2": {
-      "learned_multiplier": 1.0027085844289378,
-      "observations": 4.0
-    },
-    "1:3": {
-      "learned_multiplier": 1.0121483193246599,
-      "observations": 4.0
-    },
-    "1:4": {
-      "learned_multiplier": 1.0559609786096955,
-      "observations": 4.0
-    }
-  },
+  "usage_profiles": {},
   "running": false
 }

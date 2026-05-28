@@ -26,6 +26,7 @@ def group_suggestions_by_supplier(
         grouped[(suggestion.supplierId, supplier_name)].append(
             SupplierOrderLine(
                 productId=suggestion.productId,
+                productCode=suggestion.productCode,
                 productName=suggestion.productName,
                 quantity=quantity,
                 unit=suggestion.unit,

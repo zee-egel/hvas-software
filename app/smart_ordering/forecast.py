@@ -170,6 +170,7 @@ def calculate_suggestion(
         stockDataStatus="missing" if not has_stock_data else "stale" if stock_is_stale else "ok",
         supplierAvailable=bool(product["supplierAvailable"]),
         minimumStock=round(float(product["minimumStock"]), 1),
+        productCode=str(product.get("productCode", "")),
     )
 
 

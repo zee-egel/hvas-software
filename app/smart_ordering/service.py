@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
+import re
 from typing import Any
 
 from sqlalchemy import delete, func, insert, select, update
@@ -22,6 +23,10 @@ def parse_dt(value: str) -> datetime:
 
 def slugify(value: str) -> str:
     return "".join(char.lower() if char.isalnum() else "-" for char in value).strip("-")
+
+
+def normalize_product_code(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
 
 
 class SmartOrderingService:
@@ -150,6 +155,7 @@ class SmartOrderingService:
             context_products.append(
                 SmartOrderingProductContext(
                     productId=row["productId"],
+                    productCode=row["productCode"],
                     productName=row["productName"],
                     category=row["category"],
                     unit=row["unit"],
@@ -232,6 +238,7 @@ class SmartOrderingService:
         product_rows = [
             {
                 "productId": int(product["id"]),
+                "productCode": normalize_product_code(str(product["name"])),
                 "productName": str(product["name"]),
                 "category": str(product["category"]),
                 "unit": str(product["unit"]),

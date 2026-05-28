@@ -35,6 +35,7 @@ class SmartOrderingProductContext:
     unitCost: float
     supplierAvailable: bool
     stockDataStatus: Literal["ok", "missing", "stale"]
+    productCode: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -64,6 +65,7 @@ class SmartOrderingSuggestion:
     stockDataStatus: Literal["ok", "missing", "stale"]
     supplierAvailable: bool
     minimumStock: float
+    productCode: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -82,6 +84,7 @@ class SupplierOrderLine:
     packageQuantity: float
     packageLabel: str
     warnings: list[WarningCode]
+    productCode: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

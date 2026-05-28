@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "csv-stringify": "^6.7.0",
+    "framer-motion": "^12.40.0",
     "knip": "^6.12.2",
     "openai": "^6.39.0",
     "pdf-parse": "^2.4.5",
     "react": "^19.2.4",
+    "react-confetti": "^6.4.0",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1",

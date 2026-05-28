@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #f8faf8;
-  --color-emerald: #26d39c;
-  --color-emerald-dark: #0d5a43;
-  --color-emerald-darkest: #064434;
-  --color-emerald-light: #d9fff1;
-  --color-heading: #17342b;
-  --color-subtitle: #52625b;
-  --color-body: #6f7d78;
-  --color-border: #d9e2dd;
+  --color-bg: #fafbfa;
+  --color-emerald: #4f8a73;
+  --color-emerald-dark: #17342b;
+  --color-emerald-darkest: #102720;
+  --color-emerald-light: #ecf4ef;
+  --color-heading: #17211d;
+  --color-subtitle: #55615c;
+  --color-body: #727d79;
+  --color-border: #e6ebe8;
   --color-alert: #d64b42;
-  --color-badge-green: #2d8c6e;
+  --color-badge-green: #2f6a4f;
   --color-card: #ffffff;
-  --color-progress-track: #ecf1ee;
+  --color-progress-track: #edf1ee;
 
-  --font-sans: Inter, system-ui, sans-serif;
+  --font-sans: "Avenir Next", Inter, "Segoe UI", sans-serif;
 
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -35,7 +35,7 @@
   body {
     @apply bg-bg text-body font-sans antialiased m-0;
     min-height: 100vh;
-    background-image: none;
+    background-image: radial-gradient(circle at top, rgba(255, 255, 255, 0.8), transparent 32%);
   }
 
   #root {
@@ -56,5 +56,37 @@
   a {
     color: inherit;
     text-decoration: none;
+  }
+
+  ::selection {
+    background: rgba(23, 52, 43, 0.12);
+    color: #17211d;
+  }
+}
+
+@layer utilities {
+  .scrollbar-subtle {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(23, 52, 43, 0.18) transparent;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(23, 52, 43, 0.16);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .surface-card {
+    @apply rounded-[24px] border border-[rgba(17,24,21,0.06)] bg-white shadow-[0_12px_36px_rgba(19,27,24,0.04)];
+  }
+
+  .surface-muted {
+    @apply rounded-[22px] bg-[#f6f8f6];
   }
 }

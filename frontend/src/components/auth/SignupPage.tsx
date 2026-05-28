@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { ArrowRight, Building, Lock, Mail, User } from "../Icons";
-import { LoadingState } from "../PageState";
 import AuthShell from "./AuthShell";
 
 export default function SignupPage() {
@@ -20,11 +19,15 @@ export default function SignupPage() {
 
   if (loading && !user) {
     return (
-      <div className="min-h-screen bg-bg px-5 py-10">
-        <div className="mx-auto max-w-4xl">
-          <LoadingState title="Checking your session..." />
+      <AuthShell
+        title="Create account"
+        subtitle="Checking your session so we can route you correctly."
+        footer={<div />}
+      >
+        <div className="rounded-2xl border border-[#ddd5c9] bg-[#f7f2ea] px-4 py-4 text-sm text-[#6d6258]">
+          Restoring your session...
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
@@ -61,11 +64,11 @@ export default function SignupPage() {
   return (
     <AuthShell
       title="Create account"
-      subtitle="Set up your workspace to manage forecasting, inventory, and purchasing in one place."
+      subtitle="Create your workspace to manage forecasting, inventory, and purchasing from one calm control layer."
       footer={
-        <p className="text-center text-sm text-body">
+        <p className="text-center text-sm text-[#6d6258]">
           Already have an account?{" "}
-          <Link to="/login" className="font-semibold text-emerald-dark">
+          <Link to="/login" className="font-semibold text-[#2d4f42]">
             Sign in
           </Link>
         </p>
@@ -73,17 +76,17 @@ export default function SignupPage() {
     >
       <form className="space-y-3" onSubmit={handleSubmit}>
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-heading">
+          <label className="mb-2 block text-sm font-medium text-[#2c241c]">
             Full Name
           </label>
-          <div className="flex h-11 items-center gap-3 rounded-xl border border-border bg-[#fbfcfb] px-4">
-            <User className="h-4 w-4 text-body" />
+          <div className="flex h-12 items-center gap-3 rounded-2xl border border-[#d9d0c4] bg-[#f1ebe2] px-4">
+            <User className="h-4 w-4 text-[#8a7f73]" />
             <input
               type="text"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
               placeholder="Alex Chef"
-              className="h-full w-full bg-transparent text-sm text-heading outline-none placeholder:text-[#8a958f]"
+              className="h-full w-full bg-transparent text-sm text-[#241d17] outline-none placeholder:text-[#93877a]"
               autoComplete="name"
               required
             />
@@ -91,17 +94,17 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-heading">
+          <label className="mb-2 block text-sm font-medium text-[#2c241c]">
             Company
           </label>
-          <div className="flex h-11 items-center gap-3 rounded-xl border border-border bg-[#fbfcfb] px-4">
-            <Building className="h-4 w-4 text-body" />
+          <div className="flex h-12 items-center gap-3 rounded-2xl border border-[#d9d0c4] bg-[#f1ebe2] px-4">
+            <Building className="h-4 w-4 text-[#8a7f73]" />
             <input
               type="text"
               value={companyName}
               onChange={(event) => setCompanyName(event.target.value)}
               placeholder="HVAS Kitchens"
-              className="h-full w-full bg-transparent text-sm text-heading outline-none placeholder:text-[#8a958f]"
+              className="h-full w-full bg-transparent text-sm text-[#241d17] outline-none placeholder:text-[#93877a]"
               autoComplete="organization"
               required
             />
@@ -109,17 +112,17 @@ export default function SignupPage() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold text-heading">
+          <label className="mb-2 block text-sm font-medium text-[#2c241c]">
             Work Email
           </label>
-          <div className="flex h-11 items-center gap-3 rounded-xl border border-border bg-[#fbfcfb] px-4">
-            <Mail className="h-4 w-4 text-body" />
+          <div className="flex h-12 items-center gap-3 rounded-2xl border border-[#d9d0c4] bg-[#f1ebe2] px-4">
+            <Mail className="h-4 w-4 text-[#8a7f73]" />
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@company.com"
-              className="h-full w-full bg-transparent text-sm text-heading outline-none placeholder:text-[#8a958f]"
+              className="h-full w-full bg-transparent text-sm text-[#241d17] outline-none placeholder:text-[#93877a]"
               autoComplete="email"
               required
             />
@@ -128,34 +131,34 @@ export default function SignupPage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-heading">
+            <label className="mb-2 block text-sm font-medium text-[#2c241c]">
               Password
             </label>
-            <div className="flex h-11 items-center gap-3 rounded-xl border border-border bg-[#fbfcfb] px-4">
-              <Lock className="h-4 w-4 text-body" />
+            <div className="flex h-12 items-center gap-3 rounded-2xl border border-[#d9d0c4] bg-[#f1ebe2] px-4">
+              <Lock className="h-4 w-4 text-[#8a7f73]" />
               <input
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
-                className="h-full w-full bg-transparent text-sm text-heading outline-none placeholder:text-[#8a958f]"
+                className="h-full w-full bg-transparent text-sm text-[#241d17] outline-none placeholder:text-[#93877a]"
                 autoComplete="new-password"
                 required
               />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-heading">
+            <label className="mb-2 block text-sm font-medium text-[#2c241c]">
               Confirm Password
             </label>
-            <div className="flex h-11 items-center gap-3 rounded-xl border border-border bg-[#fbfcfb] px-4">
-              <Lock className="h-4 w-4 text-body" />
+            <div className="flex h-12 items-center gap-3 rounded-2xl border border-[#d9d0c4] bg-[#f1ebe2] px-4">
+              <Lock className="h-4 w-4 text-[#8a7f73]" />
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 placeholder="••••••••"
-                className="h-full w-full bg-transparent text-sm text-heading outline-none placeholder:text-[#8a958f]"
+                className="h-full w-full bg-transparent text-sm text-[#241d17] outline-none placeholder:text-[#93877a]"
                 autoComplete="new-password"
                 required
               />
@@ -163,35 +166,37 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-body">
+        <label className="flex items-center gap-2 pt-1 text-sm text-[#6d6258]">
           <input
             type="checkbox"
             checked={rememberMe}
             onChange={(event) => setRememberMe(event.target.checked)}
-            className="h-4 w-4 rounded border border-border"
+            className="h-4 w-4 rounded border border-[#cbbfb2] bg-transparent"
           />
           Keep me signed in on this device
         </label>
 
-        <label className="flex items-start gap-2 text-sm leading-5 text-body">
+        <label className="flex items-start gap-2 text-sm leading-5 text-[#6d6258]">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(event) => setAgreed(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border border-border"
+            className="mt-0.5 h-4 w-4 rounded border border-[#cbbfb2] bg-transparent"
           />
           I agree to the terms, privacy policy, and responsible data processing
           requirements.
         </label>
 
         {error ? (
-          <p className="text-sm font-medium text-alert">{error}</p>
+          <p className="rounded-2xl border border-[#e2c7c2] bg-[#f8ece9] px-4 py-3 text-sm font-medium text-alert">
+            {error}
+          </p>
         ) : null}
 
         <button
           type="submit"
           disabled={submitting}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-dark text-sm font-semibold text-white disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1f3b31] text-sm font-semibold text-[#f6f0e7] transition-opacity disabled:opacity-50"
         >
           Create Account
           <ArrowRight className="h-4 w-4" />

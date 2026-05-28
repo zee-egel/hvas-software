@@ -1,10 +1,9 @@
-import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSimulation } from "../useSimulation";
-import { ErrorState, LoadingState } from "./PageState";
-import ProductionStatusBanner from "./ProductionStatusBanner";
-import { AlertTriangle, Check, ChevronRight, Play, Truck, Zap } from "./Icons";
 import { useAuth } from "../AuthContext";
+import { useSimulation } from "../useSimulation";
+import { ErrorState } from "./PageState";
+import { ArrowRight, Check, Truck, Zap } from "./Icons";
+import Skeleton from "./Skeleton";
 
 function euro(value: number) {
   return new Intl.NumberFormat("nl-NL", {
@@ -14,509 +13,404 @@ function euro(value: number) {
   }).format(value);
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
 export default function Dashboard() {
-  const { data, liveSimulation, loading, error, refresh, approveOrder } =
-    useSimulation();
-  const navigate = useNavigate();
+  const { data, loading, error, refresh, approveOrder } = useSimulation();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const starterMode = user?.workspaceMode === "starter";
+  const onboarding = user?.onboardingData;
 
-  const supplierStats = useMemo(() => {
-    if (!data) return [];
-    const grouped = new Map<
-      string,
-      { draftCount: number; protectedRevenue: number; reviewCount: number }
-    >();
-    for (const order of data.purchaseOrders.active) {
-      const existing = grouped.get(order.supplierName) ?? {
-        draftCount: 0,
-        protectedRevenue: 0,
-        reviewCount: 0,
-      };
-      existing.draftCount += 1;
-      existing.protectedRevenue += order.summary.totalProtectedRevenue;
-      if (order.status === "NEEDS_REVIEW") existing.reviewCount += 1;
-      grouped.set(order.supplierName, existing);
-    }
-    return Array.from(grouped.entries()).map(([name, values]) => ({
-      name,
-      rating:
-        values.reviewCount === 0
-          ? 98
-          : Math.max(74, 96 - values.reviewCount * 7),
-      ...values,
-    }));
-  }, [data]);
-  const operationalHealth = useMemo(() => {
-    if (!data) return 0;
-    const urgentPenalty = data.summary.urgentActions * 4;
-    const reviewPenalty =
-      data.purchaseOrders.active.filter(
-        (order) => order.status === "NEEDS_REVIEW",
-      ).length * 3;
-    const variancePenalty = Math.abs(
-      liveSimulation?.variance_summary.average_absolute_skew_pct ?? 0,
-    );
-    const stockoutPenalty =
-      data.evaluation.aggregate.stockoutSimulationRate * 25;
-    return clamp(
-      Math.round(
-        100 - urgentPenalty - reviewPenalty - variancePenalty - stockoutPenalty,
-      ),
-      42,
-      99,
-    );
-  }, [data, liveSimulation]);
+  if (starterMode && onboarding) {
+    const starterProducts = onboarding.initialProducts.slice(0, 4);
+    const starterSignals = onboarding.forecastingSignals.slice(0, 4);
+    const starterSuppliers = onboarding.suppliers.slice(0, 3);
 
-  if (loading && !data)
-    return <LoadingState title="Loading executive summary..." />;
-  if (!data)
+    return (
+      <div className="space-y-5">
+        <section className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white px-6 py-6 shadow-[0_16px_50px_rgba(19,27,24,0.06)]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#eef3f0] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6a65]">
+            <Zap className="h-3.5 w-3.5" />
+            Starter workspace
+          </div>
+          <h2 className="mt-4 max-w-3xl text-[1.7rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+            {user.companyName} is set up with only your onboarding inputs.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-[#66716d]">
+            HVAS is starting clean: no shared demo orders, no injected history, just the restaurant details you gave us.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+                Restaurant type
+              </p>
+              <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
+                {onboarding.restaurantType ?? "Not set"}
+              </p>
+            </div>
+            <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+                Ordering cadence
+              </p>
+              <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
+                {onboarding.orderingFrequency ?? "Not set"}
+              </p>
+            </div>
+            <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+                First goal
+              </p>
+              <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
+                {onboarding.primaryGoal ?? "Understand demand"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+          <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
+                  What matters now
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
+                  Finish the first ordering loop
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/ordering")}
+                className="rounded-full border border-[#e5eae7] px-3 py-2 text-sm text-[#24302b]"
+              >
+                Open smart ordering
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {[
+                `Starter products: ${starterProducts.length > 0 ? starterProducts.join(", ") : "none selected"}.`,
+                `Forecast signals: ${starterSignals.length > 0 ? starterSignals.join(", ") : "default signals only"}.`,
+                `Suppliers: ${starterSuppliers.length > 0 ? starterSuppliers.join(", ") : "add suppliers next"}.`,
+              ].map((line) => (
+                <div
+                  key={line}
+                  className="flex items-start gap-3 rounded-[22px] border border-[#edf1ee] px-4 py-4"
+                >
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#edf7f1] text-[#2f6a4f]">
+                    <Check className="h-4 w-4" />
+                  </div>
+                  <p className="text-sm leading-7 text-[#17211d]">{line}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-[22px] bg-[#172f27] px-4 py-4 text-white">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a8c5b8]">
+                Next best action
+              </p>
+              <p className="mt-2 text-base font-semibold">
+                Generate your first starter suggestions
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#d3e1da]">
+                HVAS can already build a first supplier draft from your products, cadence, and forecasting signals.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/ordering")}
+                  className="rounded-full bg-white px-3 py-2 text-sm font-medium text-[#172f27]"
+                >
+                  Generate first forecast
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/settings")}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-sm text-white"
+                >
+                  Review setup
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
+                  Setup summary
+                </p>
+                <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
+                  What HVAS knows so far
+                </h3>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eef3f0] text-[#2f6a4f]">
+                <Truck className="h-4 w-4" />
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
+                <p className="text-sm font-medium text-[#17211d]">Location</p>
+                <p className="mt-1 text-sm text-[#69736f]">
+                  {onboarding.restaurantLocation?.city ?? "Not set"}
+                  {onboarding.restaurantLocation?.postalCodeOrNeighborhood
+                    ? ` · ${onboarding.restaurantLocation.postalCodeOrNeighborhood}`
+                    : ""}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
+                <p className="text-sm font-medium text-[#17211d]">Products</p>
+                <p className="mt-1 text-sm text-[#69736f]">
+                  {starterProducts.length > 0 ? starterProducts.join(", ") : "No products selected yet"}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
+                <p className="text-sm font-medium text-[#17211d]">Signals</p>
+                <p className="mt-1 text-sm text-[#69736f]">
+                  {starterSignals.length > 0 ? starterSignals.join(", ") : "Default signals only"}
+                </p>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    );
+  }
+
+  if (!data && !loading) {
     return (
       <ErrorState
-        title="Executive summary unavailable"
+        title="Workspace unavailable"
         message={error}
         onRetry={() => void refresh()}
       />
     );
+  }
 
-  const topActions = data.todaysActions.slice(0, 3);
-  const topOrders = data.purchaseOrders.active.slice(0, 3);
-  const shortage = [...data.products].sort(
-    (a, b) =>
-      b.financialImpact.potentialLostRevenue -
-      a.financialImpact.potentialLostRevenue,
-  )[0];
-  const waste = [...data.products].sort(
-    (a, b) =>
-      b.financialImpact.potentialWasteCost -
-      a.financialImpact.potentialWasteCost,
-  )[0];
-  const explainedSavings = (
-    data.summary.protectedRevenue + data.summary.potentialWastePrevented
-  ).toFixed(0);
-
-  return (
-    <div className="space-y-5">
-      <ProductionStatusBanner data={data} />
-
-      <section className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-2xl bg-emerald-dark px-6 py-6 text-white shadow-[0_18px_44px_rgba(13,90,67,0.20)]">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#89f0c7]">
+  if (!data) {
+    return (
+      <div className="space-y-5">
+        <section className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white px-6 py-6 shadow-[0_16px_50px_rgba(19,27,24,0.06)]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#eef3f0] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6a65]">
             <Zap className="h-3.5 w-3.5" />
-            Magic Assistant Summary
+            Forecast overview
           </div>
-          <h1 className="mt-4 max-w-2xl text-[20px] font-semibold leading-[1.2] md:text-[24px]">
-            Good morning, {user?.fullName.split(" ")[0]}. Your operational
-            health is at {operationalHealth}%.
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-[#c8ddd5]">
-            {data.magicSummary.message} HVAS also detected live kitchen usage
-            drift and prioritized the orders most likely to protect revenue this
-            service.
-          </p>
+          <Skeleton className="mt-4 h-10 w-full max-w-2xl rounded-2xl" />
+          <Skeleton className="mt-3 h-4 w-full max-w-xl" />
           <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl bg-white/8 p-3">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#9edec4]">
-                Revenue protected
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {euro(data.summary.protectedRevenue)}
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/8 p-3">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#9edec4]">
-                Waste prevented
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {euro(data.summary.potentialWastePrevented)}
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/8 p-3">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#9edec4]">
-                Health formula
-              </p>
-              <p className="mt-2 text-sm font-medium">
-                100 - urgent actions - PO reviews - usage skew - stockout rate
-              </p>
-            </div>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate("/purchasing")}
-              className="rounded-xl bg-[#75f2c1] px-4 py-2.5 text-sm font-semibold text-emerald-darkest"
-            >
-              Apply AI Recommendations
-            </button>
-            <button
-              onClick={() => navigate("/purchasing")}
-              className="rounded-xl border border-white/20 bg-white/6 px-4 py-2.5 text-sm font-medium text-white"
-            >
-              View Details
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-4">
-          <div className="rounded-2xl border border-border bg-white p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-heading">
-                Live Simulation
-              </p>
-              <span className="h-2.5 w-2.5 rounded-full bg-[#25d59f]" />
-            </div>
-            <p className="mt-1 text-xs text-body">
-              {liveSimulation?.is_running ? "Engine active" : "Engine idle"}
-            </p>
-            <div className="mt-4 rounded-xl border border-border bg-[#f8fbf9] p-4">
-              <div className="flex items-end gap-1.5">
-                {Object.values(
-                  liveSimulation?.actual_orders ?? { a: 2, b: 4, c: 3 },
-                ).map((value, index) => (
-                  <div
-                    key={index}
-                    className={`flex-1 rounded-t-[4px] ${
-                      index === 4 ? "bg-emerald-dark" : "bg-[#c8d8d2]"
-                    }`}
-                    style={{ height: `${Math.max(24, value * 10)}px` }}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <button
-                onClick={() => navigate("/simulation")}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-dark text-white"
-              >
-                <Play className="h-4 w-4" />
-              </button>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-heading">
-                  {(
-                    liveSimulation?.accuracy_history.at(-1) ??
-                    liveSimulation?.model_accuracy.at(-1) ??
-                    0
-                  ).toFixed(1)}
-                  % accuracy
-                </p>
-                <span className="text-sm font-medium text-emerald-dark">
-                  Full Engine <ChevronRight className="ml-1 inline h-4 w-4" />
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-border bg-white p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-body">
-              Supplier reliability
-            </p>
-            <div className="mt-4 space-y-3">
-              {supplierStats.slice(0, 2).map((supplier) => (
-                <div key={supplier.name}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-heading">
-                      {supplier.name}
-                    </span>
-                    <span
-                      className={
-                        supplier.rating >= 90
-                          ? "font-semibold text-emerald-dark"
-                          : "font-semibold text-alert"
-                      }
-                    >
-                      {supplier.rating.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full bg-progress-track">
-                    <div
-                      className={`h-2 rounded-full ${
-                        supplier.rating >= 90 ? "bg-emerald-dark" : "bg-alert"
-                      }`}
-                      style={{ width: `${supplier.rating}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Estimated Savings",
-            value: euro(
-              data.summary.estimatedWeeklySavings ??
-                data.summary.estimatedProfitImpact,
-            ),
-            note: `${euro(Number(explainedSavings))} protected revenue + prevented waste`,
-            accent: "text-emerald-dark",
-          },
-          {
-            label: "Draft Orders",
-            value: `${data.purchaseOrders.active.length} Pending`,
-            note: `${euro(
-              data.purchaseOrders.active.reduce(
-                (sum, order) => sum + order.totalAmount,
-                0,
-              ),
-            )} Total Value`,
-            accent: "text-heading",
-          },
-          {
-            label: "Shortage Risk",
-            value: shortage?.product.name ?? "Low",
-            note: shortage
-              ? `Need ${shortage.requiredStock.toFixed(1)} ${shortage.product.unit} vs ${shortage.currentStock.toFixed(1)} on hand`
-              : "No stockouts active",
-            accent: "text-alert",
-          },
-          {
-            label: "Waste Risk",
-            value: waste?.product.name ?? "Low",
-            note: waste
-              ? `${waste.excessStock.toFixed(1)} ${waste.product.unit} overstock • ${euro(waste.financialImpact.potentialWasteCost)} at risk`
-              : "No excess risk active",
-            accent: "text-heading",
-          },
-        ].map((card) => (
-          <article
-            key={card.label}
-            className="rounded-2xl border border-border bg-white p-5 shadow-[0_4px_18px_rgba(17,38,31,0.04)]"
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-body">
-              {card.label}
-            </p>
-            <p className={`mt-3 text-[18px] font-semibold ${card.accent}`}>
-              {card.value}
-            </p>
-            <p className="mt-2 text-xs text-body">{card.note}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-2xl border border-border bg-white">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-lg font-semibold text-heading">
-              Today&apos;s Actions
-            </h2>
-            <span className="rounded-full bg-emerald-light px-2.5 py-1 text-[11px] font-semibold text-emerald-dark">
-              {topActions.length} Tasks
-            </span>
-          </div>
-          <div>
-            {topActions.map((action, index) => (
-              <div
-                key={action.id}
-                className={`flex items-start gap-4 px-5 py-5 ${
-                  index !== topActions.length - 1
-                    ? "border-b border-border"
-                    : ""
-                }`}
-              >
-                <div
-                  className={`mt-1 flex h-9 w-9 items-center justify-center rounded-full ${
-                    action.type === "PURCHASE_ORDER"
-                      ? "bg-[#d8fff0] text-emerald-dark"
-                      : "bg-[#fff0ef] text-alert"
-                  }`}
-                >
-                  {action.type === "PURCHASE_ORDER" ? (
-                    <Truck className="h-4 w-4" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-heading">
-                    {action.title}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-body">
-                    {action.description}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() =>
-                        action.type === "PURCHASE_ORDER"
-                          ? void approveOrder(action.id)
-                          : navigate("/purchasing")
-                      }
-                      className="rounded-lg bg-emerald-dark px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      {action.type === "PURCHASE_ORDER"
-                        ? "Approve Now"
-                        : "Review Risk"}
-                    </button>
-                    <button
-                      onClick={() => navigate("/purchasing")}
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-subtitle"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-heading">
-                    {euro(action.impact)}
-                  </p>
-                  <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-body">
-                    {action.status}
-                  </p>
-                </div>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="mt-3 h-9 w-28" />
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        <div className="grid gap-5">
-          <div className="rounded-2xl border border-border bg-white p-5">
-            <p className="text-sm font-semibold text-heading">
-              Kitchen Throughput
+        <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+          <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-3 h-8 w-48" />
+            <div className="mt-5 space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} className="h-20 w-full rounded-[22px]" />
+              ))}
+            </div>
+          </article>
+          <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="mt-3 h-8 w-40" />
+            <div className="mt-5 space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} className="h-16 w-full rounded-[22px]" />
+              ))}
+            </div>
+          </article>
+        </section>
+      </div>
+    );
+  }
+
+  const urgentProduct = [...data.products]
+    .sort(
+      (a, b) =>
+        b.financialImpact.potentialLostRevenue -
+        a.financialImpact.potentialLostRevenue,
+    )
+    .at(0);
+  const wasteRisk = [...data.products]
+    .sort(
+      (a, b) =>
+        b.financialImpact.potentialWasteCost -
+        a.financialImpact.potentialWasteCost,
+    )
+    .at(0);
+  const nextDrafts = data.purchaseOrders.active.slice(0, 3);
+  const firstAction = data.todaysActions.at(0);
+  const goalLabel = onboarding?.primaryGoal ?? "Save time ordering";
+  const restaurantType = onboarding?.restaurantType ?? data.restaurant.type;
+
+  const summaryLines = [
+    urgentProduct
+      ? `You may run low on ${urgentProduct.product.name.toLowerCase()} soon.`
+      : "No major shortage signal right now.",
+    wasteRisk
+      ? `${wasteRisk.product.name} has the highest overstock risk.`
+      : "Waste exposure is currently low.",
+    `${data.purchaseOrders.active.length} draft orders are ready.`,
+  ];
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white px-6 py-6 shadow-[0_16px_50px_rgba(19,27,24,0.06)]">
+        <div className="inline-flex items-center gap-2 rounded-full bg-[#eef3f0] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6a65]">
+          <Zap className="h-3.5 w-3.5" />
+          {restaurantType}
+        </div>
+        <h2 className="mt-4 max-w-3xl text-[1.7rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+          {user?.companyName ?? data.restaurant.name}: {data.summary.urgentActions} items need attention before the next order.
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[#66716d]">
+          Focus on forecast risk, overstock risk, and the first goal you picked: {goalLabel.toLowerCase()}.
+        </p>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+              Protected revenue
             </p>
-            <div className="mt-4 flex items-end justify-between">
-              <span className="text-[34px] font-semibold text-heading">
-                {(
-                  100 -
-                  data.evaluation.aggregate.stockoutSimulationRate * 100 -
-                  data.evaluation.aggregate.wasteSimulationRate * 40
-                ).toFixed(0)}
-                %
-              </span>
-              <span className="text-sm text-body">Orders on-time</span>
-            </div>
-            <div className="mt-4 h-2 rounded-full bg-progress-track">
-              <div
-                className="h-2 rounded-full bg-[#6cf0bd]"
-                style={{
-                  width: `${clamp(
-                    100 -
-                      data.evaluation.aggregate.stockoutSimulationRate * 100 -
-                      data.evaluation.aggregate.wasteSimulationRate * 40,
-                    10,
-                    100,
-                  )}%`,
-                }}
-              />
-            </div>
+            <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+              {euro(data.summary.protectedRevenue)}
+            </p>
           </div>
-          <div className="rounded-2xl border border-border bg-white p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-heading">
-                Active Learning
-              </p>
-              <Check className="h-4 w-4 text-emerald-dark" />
-            </div>
-            <p className="mt-3 text-sm leading-6 text-body">
-              Ingredient variance tracking is active. HVAS is learning how your
-              kitchen portions run against recipe targets and adjusting reorder
-              precision over time.
+          <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+              Waste prevented
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-[#f6faf8] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-body">
-                  Avg absolute skew
-                </p>
-                <p className="mt-2 font-semibold text-heading">
-                  {(
-                    liveSimulation?.variance_summary
-                      .average_absolute_skew_pct ?? 0
-                  ).toFixed(1)}
-                  %
-                </p>
-              </div>
-              <div className="rounded-xl bg-[#f6faf8] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-body">
-                  Accuracy WAPE
-                </p>
-                <p className="mt-2 font-semibold text-heading">
-                  {(data.evaluation.aggregate.wape * 100).toFixed(1)}%
-                </p>
-              </div>
-            </div>
+            <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+              {euro(data.summary.potentialWastePrevented)}
+            </p>
+          </div>
+          <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+              Draft orders
+            </p>
+            <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+              {data.purchaseOrders.active.length}
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-        <div className="rounded-2xl border border-border bg-white">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-lg font-semibold text-heading">
-              Top Draft Orders
-            </h2>
-            <span className="text-sm font-medium text-emerald-dark">
-              View All Purchasing
-            </span>
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+        <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
+                What matters now
+              </p>
+              <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
+                Keep it simple
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/ordering")}
+              className="rounded-full border border-[#e5eae7] px-3 py-2 text-sm text-[#24302b]"
+            >
+              Open smart ordering
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-[0.12em] text-body">
-                  <th className="px-5 py-3">Supplier</th>
-                  <th className="px-5 py-3">Type</th>
-                  <th className="px-5 py-3">Items</th>
-                  <th className="px-5 py-3">Total Value</th>
-                  <th className="px-5 py-3">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topOrders.map((order) => (
-                  <tr key={order.id} className="border-t border-border">
-                    <td className="px-5 py-4 text-sm font-medium text-heading">
-                      {order.supplierName}
-                    </td>
-                    <td className="px-5 py-4 text-xs text-body">
-                      {order.status === "NEEDS_REVIEW" ? "DAILY" : "STOCK"}
-                    </td>
-                    <td className="px-5 py-4 text-sm text-subtitle">
-                      {order.itemCount} SKUs
-                    </td>
-                    <td className="px-5 py-4 text-sm text-subtitle">
-                      {euro(order.totalAmount)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <button
-                        onClick={() => navigate("/purchasing")}
-                        className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-heading"
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
 
-        <div className="rounded-2xl border border-border bg-white p-5">
-          <p className="text-sm font-semibold text-heading">Operational Note</p>
-          <p className="mt-3 text-sm leading-6 text-body">
-            {liveSimulation?.recent_events[0] ??
-              "No live simulation events recorded yet."}
-          </p>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl bg-[#f4f8f6] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-body">
-                Protected revenue
+          <div className="mt-5 space-y-3">
+            {summaryLines.map((line) => (
+              <div
+                key={line}
+                className="flex items-start gap-3 rounded-[22px] border border-[#edf1ee] px-4 py-4"
+              >
+                <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#edf7f1] text-[#2f6a4f]">
+                  <Check className="h-4 w-4" />
+                </div>
+                <p className="text-sm leading-7 text-[#17211d]">{line}</p>
+              </div>
+            ))}
+          </div>
+
+          {firstAction ? (
+            <div className="mt-5 rounded-[22px] bg-[#172f27] px-4 py-4 text-white">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a8c5b8]">
+                Next best action
               </p>
-              <p className="mt-2 text-2xl font-semibold text-heading">
-                {euro(data.summary.protectedRevenue)}
+              <p className="mt-2 text-base font-semibold">
+                {firstAction.title}
               </p>
+              <p className="mt-2 text-sm leading-6 text-[#d3e1da]">
+                {firstAction.description}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    firstAction.type === "PURCHASE_ORDER"
+                      ? void approveOrder(firstAction.id)
+                      : navigate("/ordering")
+                  }
+                  className="rounded-full bg-white px-3 py-2 text-sm font-medium text-[#172f27]"
+                >
+                  Take action
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/ordering")}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-sm text-white"
+                >
+                  Review forecast
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div className="rounded-xl bg-[#f4f8f6] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-body">
-                Forecast error
+          ) : null}
+        </article>
+
+        <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
+                Supplier drafts
               </p>
-              <p className="mt-2 text-2xl font-semibold text-heading">
-                {data.evaluation.aggregate.rmse.toFixed(1)}
-              </p>
+              <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
+                Ready for review
+              </h3>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eef3f0] text-[#2f6a4f]">
+              <Truck className="h-4 w-4" />
             </div>
           </div>
-        </div>
+
+          <div className="mt-5 space-y-3">
+            {nextDrafts.length === 0 ? (
+              <div className="rounded-[22px] border border-dashed border-[#e5eae7] px-4 py-6 text-sm text-[#69736f]">
+                No drafts are waiting right now.
+              </div>
+            ) : (
+              nextDrafts.map((order) => (
+                <div
+                  key={order.id}
+                  className="rounded-[22px] border border-[#edf1ee] px-4 py-4"
+                >
+                  <p className="text-sm font-medium text-[#17211d]">
+                    {order.supplierName}
+                  </p>
+                  <p className="mt-1 text-sm text-[#69736f]">
+                    {order.itemCount} items · {euro(order.totalAmount)}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </article>
       </section>
     </div>
   );

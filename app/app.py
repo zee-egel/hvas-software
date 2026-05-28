@@ -1,4 +1,5 @@
 from functools import wraps
+from copy import deepcopy
 
 from flask import Flask, jsonify, render_template, request, session
 from flask_cors import CORS
@@ -70,6 +71,23 @@ def login_required(view):
     return wrapped
 
 
+def personalize_restaurant_payload(payload, user):
+    result = deepcopy(payload)
+    restaurant = dict(result.get("restaurant") or {})
+    onboarding = (user or {}).get("onboardingData") or {}
+    location = onboarding.get("restaurantLocation") or {}
+
+    restaurant["name"] = user.get("companyName") or restaurant.get("name")
+    if onboarding.get("restaurantType"):
+        restaurant["type"] = onboarding["restaurantType"]
+    if location.get("city"):
+        restaurant["location"] = location["city"]
+    elif location.get("postalCodeOrNeighborhood"):
+        restaurant["location"] = location["postalCodeOrNeighborhood"]
+    result["restaurant"] = restaurant
+    return result
+
+
 @app.errorhandler(ValueError)
 def handle_value_error(error):
     return jsonify({"success": False, "error": str(error)}), 400
@@ -132,13 +150,45 @@ def logout():
 @app.get("/api/restaurant")
 @login_required
 def get_restaurant():
-    return jsonify(order_assistant.get_restaurant())
+    user = current_user()
+    return jsonify(personalize_restaurant_payload(order_assistant.get_restaurant(), user))
 
 
 @app.get("/api/order-advice")
 @login_required
 def get_order_advice():
-    return jsonify(order_assistant.get_order_advice())
+    user = current_user()
+    return jsonify(personalize_restaurant_payload(order_assistant.get_order_advice(), user))
+
+
+@app.get("/api/onboarding")
+@login_required
+def get_onboarding():
+    user = current_user()
+    return jsonify(order_assistant.get_user_onboarding(int(user["id"])))
+
+
+@app.put("/api/onboarding")
+@login_required
+def save_onboarding():
+    user = current_user()
+    payload = request.get_json() or {}
+    onboarding = order_assistant.save_user_onboarding(
+        user_id=int(user["id"]),
+        onboarding_data=payload.get("data") or {},
+        completed=payload.get("completed"),
+    )
+    refreshed_user = order_assistant.get_user_by_id(int(user["id"]))
+    return jsonify({"success": True, "user": refreshed_user, "onboarding": onboarding})
+
+
+@app.post("/api/onboarding/reset")
+@login_required
+def reset_onboarding():
+    user = current_user()
+    onboarding = order_assistant.reset_user_onboarding(int(user["id"]))
+    refreshed_user = order_assistant.get_user_by_id(int(user["id"]))
+    return jsonify({"success": True, "user": refreshed_user, "onboarding": onboarding})
 
 
 @app.get("/api/smart-ordering/context")

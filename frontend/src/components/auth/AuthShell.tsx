@@ -14,48 +14,81 @@ export default function AuthShell({
   footer: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#031d19] px-4 py-6 text-heading">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_12%,rgba(111,243,206,0.85),transparent_32%),radial-gradient(circle_at_8%_94%,rgba(198,220,121,0.72),transparent_28%),linear-gradient(140deg,#02100e_18%,#04372c_58%,#0b5d48_100%)]" />
-      <div className="relative flex min-h-[calc(100vh-3rem)] items-center justify-center">
-        <div className="w-full max-w-md rounded-3xl border border-white/25 bg-white px-6 py-7 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border bg-white shadow-[0_6px_16px_rgba(17,38,31,0.08)]">
-              <Logo className="h-10 w-10 object-contain" />
+    <div className="min-h-screen bg-white text-heading">
+      <div className="grid min-h-screen lg:grid-cols-[2fr_3fr]">
+        <section className="flex min-h-screen items-center justify-center bg-[#fffdfa] px-6 py-10">
+          <div className="w-full max-w-108">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[#d9e2dd] bg-white">
+                <Logo className="h-10 w-10 object-contain" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold tracking-[-0.03em] text-emerald-dark">
+                  HVAS
+                </p>
+                <p className="text-xs tracking-[0.18em] uppercase text-[#7b8782]">
+                  Inventory Intelligence
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-lg font-semibold tracking-[-0.02em] text-emerald-darkest">
-                HVAS
+
+            <div className="mt-10">
+              <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-emerald-dark">
+                {title}
+              </h2>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-emerald-dark">
+                {subtitle}
               </p>
-              <p className="text-xs text-body">Operational Excellence</p>
+            </div>
+
+            <div className="mt-8">{children}</div>
+
+            <div className="mt-6">{footer}</div>
+
+            <div className="mt-8 border-t border-[#e3ebe6] pt-4 text-center text-xs text-[#7b8782]">
+              <p>&copy; 2026 HVAS Systemen BV</p>
+              <div className="mt-2 flex items-center justify-center gap-5">
+                <Link to="/login" className="hover:text-heading">
+                  Privacy
+                </Link>
+                <Link to="/login" className="hover:text-heading">
+                  Terms
+                </Link>
+                <Link to="/login" className="hover:text-heading">
+                  Support
+                </Link>
+              </div>
             </div>
           </div>
+        </section>
 
-          <div className="mt-6">
-            <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-heading">
-              {title}
-            </h2>
-            <p className="mt-1 text-sm text-body">{subtitle}</p>
-          </div>
+        <aside className="relative hidden overflow-hidden bg-[#123c31] lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:justify-center">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(77,140,118,0.45),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(48,92,76,0.55),transparent_32%),linear-gradient(180deg,#18483a_0%,#123c31_100%)]" />
+          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)]" />
 
-          <div className="mt-6">{children}</div>
+          <div className="relative z-10 flex w-full max-w-170 flex-col items-center px-12 text-center text-white">
+            <div className="aspect-16/10 w-full overflow-hidden rounded-4xl border border-white/15 bg-white/8 shadow-[0_30px_80px_rgba(8,24,19,0.22)] backdrop-blur-[2px]">
+              <img
+                src="/hvas-dashboard.png"
+                alt="HVAS dashboard preview"
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
 
-          <div className="mt-5">{footer}</div>
-
-          <div className="mt-6 border-t border-border pt-4 text-center text-xs text-body">
-            <p>&copy; 2026 HVAS Systems Inc.</p>
-            <div className="mt-2 flex items-center justify-center gap-5">
-              <Link to="/login" className="hover:text-heading">
-                Privacy
-              </Link>
-              <Link to="/login" className="hover:text-heading">
-                Terms
-              </Link>
-              <Link to="/login" className="hover:text-heading">
-                Support
-              </Link>
+            <div className="mt-10 max-w-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#b7d1c7]">
+                Calm control for purchasing
+              </p>
+              <h3 className="mt-4 text-[2rem] font-semibold tracking-[-0.03em] text-white">
+                Forecast, review, and order with less noise.
+              </h3>
+              <p className="mt-4 text-sm leading-7 text-[#d1e1da]">
+                Built for teams that want cleaner inventory decisions and a more
+                focused daily workflow.
+              </p>
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

@@ -9,8 +9,11 @@ import {
   fetchAuthSession,
   loginUser,
   logoutUser,
+  saveOnboarding as saveOnboardingRequest,
   signupUser,
   type AuthUser,
+  type OnboardingData,
+  resetOnboarding as resetOnboardingRequest,
 } from "./api/client";
 
 interface AuthContextType {
@@ -31,6 +34,11 @@ interface AuthContextType {
   }) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  saveOnboarding: (payload: {
+    data: OnboardingData;
+    completed?: boolean;
+  }) => Promise<void>;
+  resetOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -92,9 +100,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const saveOnboarding = useCallback(
+    async (payload: { data: OnboardingData; completed?: boolean }) => {
+      setError(null);
+      const response = await saveOnboardingRequest(payload);
+      setUser(response.user);
+    },
+    [],
+  );
+
+  const resetOnboarding = useCallback(async () => {
+    setError(null);
+    const response = await resetOnboardingRequest();
+    setUser(response.user);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, error, login, signup, logout, refreshSession }}
+      value={{
+        user,
+        loading,
+        error,
+        login,
+        signup,
+        logout,
+        refreshSession,
+        saveOnboarding,
+        resetOnboarding,
+      }}
     >
       {children}
     </AuthContext.Provider>
