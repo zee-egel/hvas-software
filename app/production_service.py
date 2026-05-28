@@ -106,14 +106,16 @@ def normalize_column_name(value: str) -> str:
 
 
 class ProductionOperationsService:
-    def __init__(self, db_url: str) -> None:
+    def __init__(self, db_url: str, bootstrap_sample_data: bool = True) -> None:
         self.db_url = db_url
+        self.bootstrap_sample_data = bootstrap_sample_data
         self.engine: Engine = create_engine(db_url, future=True, pool_pre_ping=True)
         self.metadata = MetaData()
         self._define_tables()
         self.metadata.create_all(self.engine)
-        self._sync_seed_catalog_if_needed()
-        self._bootstrap_if_empty()
+        if self.bootstrap_sample_data:
+            self._sync_seed_catalog_if_needed()
+            self._bootstrap_if_empty()
 
     def _define_tables(self) -> None:
         self.suppliers = Table(

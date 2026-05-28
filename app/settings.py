@@ -14,6 +14,7 @@ SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 # When deployed cross-origin, cookies must be SameSite=None; Secure
 SESSION_COOKIE_SAMESITE = "None" if SESSION_COOKIE_SECURE else "Lax"
+FRONTEND_DIST_DIR = os.getenv("FRONTEND_DIST_DIR", os.path.join(APP_DIR, "frontend_dist"))
 
 HIST_DATA_PATH = os.path.join(os.path.expanduser('~'), 'historical_data.csv')
 SD_WEEKLY_ORDERS = 160
@@ -57,6 +58,18 @@ PRODUCTION_DB_URL = _normalize_database_url(
     or os.getenv("PRODUCTION_DB_URL")
     or (_postgres_url_from_settings() if _has_explicit_postgres_settings() else _sqlite_url_from_settings())
 )
+
+
+def _default_bootstrap_sample_data() -> bool:
+    # Keep local sqlite development convenient, but start with a blank workspace
+    # in production-style Postgres deployments such as Railway.
+    return PRODUCTION_DB_URL.startswith("sqlite")
+
+
+BOOTSTRAP_SAMPLE_DATA = os.getenv(
+    "BOOTSTRAP_SAMPLE_DATA",
+    "true" if _default_bootstrap_sample_data() else "false",
+).lower() == "true"
 
 DEFAULT_SIM_CONFIG = {
     'order_variance': 18,

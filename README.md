@@ -2,6 +2,41 @@
 
 PRIMS is a Flask-based app that predicts ingredient demand for restaurants, reducing waste and preventing stockouts. It uses machine learning to automate inventory management and order placement.
 
+## Deploying to Railway
+
+This repository is now prepared for a straightforward Railway deployment as:
+
+- `1` web service for the full HVAS app
+- `1` PostgreSQL service
+
+The frontend is built into the Flask service during the Docker build, so you do not need a separate Railway frontend service.
+
+### Railway steps
+
+1. Import this GitHub repository into Railway.
+2. Add a `PostgreSQL` service to the same Railway project.
+3. Create one app service from this repo root.
+4. Railway will detect and use:
+   - `Dockerfile`
+   - `railway.json`
+5. Set these service variables on the app service:
+   - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+   - `SECRET_KEY=<long-random-secret>`
+   - `SESSION_COOKIE_SECURE=true`
+   - `BOOTSTRAP_SAMPLE_DATA=false`
+   - `OPENAI_API_KEY=<your-openai-api-key>`
+6. Deploy.
+
+### Production behavior
+
+- Railway/Postgres deployments start blank by default unless you explicitly enable sample data.
+- New users land in onboarding first and can build their workspace from there.
+- The app serves the Vite frontend and Flask API from the same domain, so you do not need `VITE_API_BASE_URL` in production.
+
+### Local development variables
+
+Use `.env.example` as the starting point for local development.
+
 ## Getting Started
 
 ### Prerequisites
@@ -96,17 +131,22 @@ Visit `http://127.0.0.1:5000/` in your browser to see the app.
 predictive-restaurant-inventory/
 ├── app/
 │   ├── app.py
-│   ├── db_config.py
 │   ├── csv/
-│   ├── models/
-│   ├── static/
-│   ├── templates/
-│   └── training_and_diagnostics/
-├── documentation/
-│   └── images/          # Folder for documentation images, can add for ppt
-├── .venv/                # Virtual environment
-├── requirements.txt      # Python dependencies
-└── README.md             # This file
+│   ├── data/
+│   ├── scripts/
+│   ├── smart_ordering/
+│   ├── order_advice_seed.py
+│   ├── order_advice_service.py
+│   ├── production_service.py
+│   ├── settings.py
+│   └── simulation_service.py
+├── frontend/
+│   ├── public/
+│   └── src/
+├── Dockerfile
+├── railway.json
+├── requirements.txt
+└── README.md
 
 ```
 

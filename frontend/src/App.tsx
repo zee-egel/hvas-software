@@ -139,14 +139,14 @@ function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0d1311]/28 backdrop-blur-[3px]">
+    <div className="fixed inset-0 z-50 bg-[#0d1311]/28 backdrop-blur-sm">
       <button
         type="button"
         aria-label="Close command palette"
         className="absolute inset-0"
         onClick={onClose}
       />
-      <div className="relative mx-auto mt-16 w-[min(92vw,42rem)] overflow-hidden rounded-[24px] border border-[#dfe6e2] bg-white shadow-[0_28px_80px_rgba(17,24,21,0.16)]">
+      <div className="relative mx-auto mt-16 w-11/12 max-w-2xl overflow-hidden rounded-3xl border border-[#dfe6e2] bg-white shadow-2xl">
         <div className="flex items-center gap-3 border-b border-[#edf1ee] px-4 py-4">
           <Search className="h-4 w-4 text-[#7e8a85]" />
           <input
@@ -165,9 +165,9 @@ function CommandPalette({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="max-h-[24rem] overflow-y-auto p-2">
+        <div className="max-h-96 overflow-y-auto p-2">
           {commandItems.length === 0 ? (
-            <div className="rounded-[18px] px-4 py-8 text-center text-sm text-[#7e8a85]">
+            <div className="rounded-xl px-4 py-8 text-center text-sm text-[#7e8a85]">
               No matching commands.
             </div>
           ) : (
@@ -179,7 +179,7 @@ function CommandPalette({
                   item.action();
                   onClose();
                 }}
-                className="flex w-full items-start justify-between rounded-[18px] px-4 py-3 text-left transition-colors hover:bg-[#f5f7f5]"
+                className="flex w-full items-start justify-between rounded-xl px-4 py-3 text-left transition-colors hover:bg-[#f5f7f5]"
               >
                 <div>
                   <p className="text-sm font-medium text-[#17211d]">
@@ -200,7 +200,7 @@ function CommandPalette({
 }
 
 function WorkspaceRouteFrame({ children }: { children: ReactNode }) {
-  return <div className="mx-auto w-full max-w-[88rem]">{children}</div>;
+  return <div className="mx-auto w-full max-w-screen-2xl">{children}</div>;
 }
 
 function ProtectedAppShell() {
@@ -258,18 +258,18 @@ function ProtectedAppShell() {
       />
 
       {logoutConfirmOpen ? (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-[#0d1311]/28 px-4 backdrop-blur-[3px]">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-[#0d1311]/28 px-4 backdrop-blur-sm">
           <button
             type="button"
             aria-label="Close sign out confirmation"
             className="absolute inset-0"
             onClick={() => setLogoutConfirmOpen(false)}
           />
-          <div className="relative w-full max-w-md rounded-[28px] border border-[rgba(17,24,21,0.08)] bg-white p-6 shadow-[0_30px_80px_rgba(17,24,21,0.16)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a09d]">
+          <div className="relative w-full max-w-md rounded-3xl border border-[rgba(17,24,21,0.08)] bg-white p-6 shadow-2xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#98a09d]">
               Sign out
             </p>
-            <h2 className="mt-3 text-[1.5rem] font-semibold tracking-[-0.03em] text-[#18231f]">
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#18231f]">
               Do you really want to sign out?
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#66716d]">
@@ -304,19 +304,19 @@ function ProtectedAppShell() {
         />
       ) : null}
 
-      <div className="grid min-h-screen lg:grid-cols-[auto_1fr]">
+      <div className="min-h-screen lg:flex">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-[18rem] flex-col border-r border-[rgba(17,24,21,0.06)] bg-[#f7f8f7] px-3 py-4 transition-transform duration-200 lg:sticky lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[rgba(17,24,21,0.06)] bg-[#f7f8f7] px-3 py-4 transition-transform duration-200 lg:sticky lg:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } ${sidebarCollapsed ? "lg:w-[5.75rem]" : ""}`}
+          } ${sidebarCollapsed ? "lg:w-24" : ""}`}
         >
           <div className="flex items-center justify-between gap-2 px-2">
             <button
               type="button"
               onClick={() => navigate("/overview")}
-              className="flex min-w-0 items-center gap-3 rounded-[18px] px-2 py-2 text-left transition-colors hover:bg-white"
+              className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-white shadow-[0_1px_2px_rgba(17,24,21,0.06)]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
                 <Logo className="h-8 w-8 object-contain" />
               </div>
               {!sidebarCollapsed ? (
@@ -347,7 +347,7 @@ function ProtectedAppShell() {
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="mt-5 flex items-center gap-3 rounded-[18px] border border-[rgba(17,24,21,0.06)] bg-white px-3 py-3 text-left shadow-[0_1px_2px_rgba(17,24,21,0.04)] transition-colors hover:border-[rgba(17,24,21,0.1)]"
+            className="mt-5 flex items-center gap-3 rounded-xl border border-[rgba(17,24,21,0.06)] bg-white px-3 py-3 text-left shadow-sm transition-colors hover:border-[rgba(17,24,21,0.1)]"
           >
             <Search className="h-4 w-4 shrink-0 text-[#7e8a85]" />
             {!sidebarCollapsed ? (
@@ -355,7 +355,7 @@ function ProtectedAppShell() {
                 <span className="flex-1 text-sm text-[#6c7672]">
                   Search or jump
                 </span>
-                <span className="rounded-md border border-[#e5e9e7] px-1.5 py-0.5 text-[10px] text-[#97a09c]">
+                <span className="rounded-md border border-[#e5e9e7] px-1.5 py-0.5 text-xs text-[#97a09c]">
                   ⌘K
                 </span>
               </>
@@ -365,7 +365,7 @@ function ProtectedAppShell() {
           <div className="mt-6 space-y-5 overflow-y-auto pb-6">
             <div>
               {!sidebarCollapsed ? (
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a09d]">
+                <p className="px-3 text-xs font-semibold uppercase tracking-widest text-[#98a09d]">
                   Workspace
                 </p>
               ) : null}
@@ -376,9 +376,9 @@ function ProtectedAppShell() {
                     to={item.to}
                     onClick={() => setMobileSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 rounded-[18px] px-3 py-3 text-sm transition-all ${
+                      `group flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all ${
                         isActive
-                          ? "bg-white text-[#17211d] shadow-[0_1px_2px_rgba(17,24,21,0.05)]"
+                          ? "bg-white text-[#17211d] shadow-sm"
                           : "text-[#5f6a65] hover:bg-white/75 hover:text-[#17211d]"
                       }`
                     }
@@ -399,7 +399,7 @@ function ProtectedAppShell() {
 
             <div>
               {!sidebarCollapsed ? (
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a09d]">
+                <p className="px-3 text-xs font-semibold uppercase tracking-widest text-[#98a09d]">
                   System
                 </p>
               ) : null}
@@ -410,9 +410,9 @@ function ProtectedAppShell() {
                     to={item.to}
                     onClick={() => setMobileSidebarOpen(false)}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 rounded-[18px] px-3 py-3 text-sm transition-all ${
+                      `group flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition-all ${
                         isActive
-                          ? "bg-white text-[#17211d] shadow-[0_1px_2px_rgba(17,24,21,0.05)]"
+                          ? "bg-white text-[#17211d] shadow-sm"
                           : "text-[#5f6a65] hover:bg-white/75 hover:text-[#17211d]"
                       }`
                     }
@@ -429,8 +429,8 @@ function ProtectedAppShell() {
             </div>
 
             {!sidebarCollapsed ? (
-              <div className="rounded-[22px] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(17,24,21,0.05)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a09d]">
+              <div className="rounded-2xl bg-white px-4 py-4 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[#98a09d]">
                   Recent
                 </p>
                 <div className="mt-3 space-y-2">
@@ -439,7 +439,7 @@ function ProtectedAppShell() {
                       key={item.to}
                       type="button"
                       onClick={() => navigate(item.to)}
-                      className="flex w-full items-center justify-between rounded-[16px] px-2 py-2 text-left transition-colors hover:bg-[#f5f7f5]"
+                      className="flex w-full items-center justify-between rounded-2xl px-2 py-2 text-left transition-colors hover:bg-[#f5f7f5]"
                     >
                       <span className="text-sm text-[#22302a]">
                         {item.label}
@@ -464,9 +464,9 @@ function ProtectedAppShell() {
           </div>
         </aside>
 
-        <div className="min-w-0">
-          <header className="sticky top-0 z-20 border-b border-[rgba(17,24,21,0.06)] bg-[rgba(250,251,250,0.82)] backdrop-blur-xl">
-            <div className="mx-auto flex max-w-368 items-center gap-4 px-4 py-3 sm:px-6">
+        <div className="min-w-0 flex-1">
+          <header className="sticky top-0 z-20 border-b border-[rgba(17,24,21,0.06)] bg-white/80 backdrop-blur-xl">
+            <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 py-3 sm:px-6">
               <button
                 type="button"
                 onClick={() => setMobileSidebarOpen(true)}
@@ -476,14 +476,14 @@ function ProtectedAppShell() {
               </button>
 
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#99a29d]">
+                <p className="text-xs font-medium uppercase tracking-wider text-[#99a29d]">
                   {formatDateLabel()}
                 </p>
                 <div className="mt-1 flex items-center gap-2">
-                  <h1 className="truncate text-[1.35rem] font-semibold tracking-[-0.03em] text-[#18231f] sm:text-[1.65rem]">
+                  <h1 className="truncate text-2xl font-semibold tracking-tight text-[#18231f] sm:text-3xl">
                     {currentPage.label}
                   </h1>
-                  <span className="hidden rounded-full bg-[#eef2ef] px-2.5 py-1 text-[11px] text-[#6f7b76] md:inline-flex">
+                  <span className="hidden rounded-full bg-[#eef2ef] px-2.5 py-1 text-xs text-[#6f7b76] md:inline-flex">
                     {currentPage.description}
                   </span>
                 </div>
@@ -492,13 +492,13 @@ function ProtectedAppShell() {
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
-                className="hidden min-w-[14rem] items-center justify-between rounded-full border border-[rgba(17,24,21,0.08)] bg-white px-4 py-2.5 text-sm text-[#6d7773] shadow-[0_1px_2px_rgba(17,24,21,0.04)] md:flex"
+                className="hidden min-w-56 items-center justify-between rounded-full border border-[rgba(17,24,21,0.08)] bg-white px-4 py-2.5 text-sm text-[#6d7773] shadow-sm md:flex"
               >
                 <span className="inline-flex items-center gap-2">
                   <Search className="h-4 w-4 text-[#8d9792]" />
                   Find anything
                 </span>
-                <span className="rounded-md border border-[#e5e9e7] px-1.5 py-0.5 text-[10px] text-[#97a09c]">
+                <span className="rounded-md border border-[#e5e9e7] px-1.5 py-0.5 text-xs text-[#97a09c]">
                   ⌘K
                 </span>
               </button>
@@ -515,7 +515,7 @@ function ProtectedAppShell() {
                 <button
                   type="button"
                   onClick={() => navigate("/account")}
-                  className="hidden items-center gap-3 rounded-full border border-[rgba(17,24,21,0.08)] bg-white px-2 py-1.5 shadow-[0_1px_2px_rgba(17,24,21,0.04)] sm:inline-flex"
+                  className="hidden items-center gap-3 rounded-full border border-[rgba(17,24,21,0.08)] bg-white px-2 py-1.5 shadow-sm sm:inline-flex"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ecf2ee] text-sm font-semibold text-[#17342b]">
                     {user?.initials ?? "HV"}
@@ -575,8 +575,8 @@ function ProtectedApp() {
     return (
       <div className="min-h-screen bg-bg px-5 py-10">
         <div className="mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-[0_12px_32px_rgba(15,23,42,0.04)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-body">
+          <div className="rounded-2xl border border-border bg-white px-5 py-4 shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-wider text-body">
               Workspace
             </p>
             <p className="mt-2 text-sm font-medium text-heading">

@@ -682,9 +682,12 @@ export default function OnboardingPage() {
             <div className="grid gap-4">
               {twinMethodDetails.map((option) => {
                 const selected =
-                  data.digitalTwinSetup?.selectedMethods.includes(option.method) ??
-                  false;
-                const recommended = recommendedTwinMethods.includes(option.method);
+                  data.digitalTwinSetup?.selectedMethods.includes(
+                    option.method,
+                  ) ?? false;
+                const recommended = recommendedTwinMethods.includes(
+                  option.method,
+                );
 
                 return (
                   <button
@@ -714,7 +717,7 @@ export default function OnboardingPage() {
                         {option.method}
                       </p>
                       {recommended ? (
-                        <span className="rounded-full bg-[#17342b] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                        <span className="rounded-full bg-emerald-dark px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
                           Recommended
                         </span>
                       ) : null}
@@ -772,7 +775,7 @@ export default function OnboardingPage() {
             className="space-y-6"
           >
             <OnboardingSummary data={data} />
-            <div className="rounded-[26px] bg-[#17342b] px-5 py-5 text-white">
+            <div className="rounded-[26px] bg-emerald-dark px-5 py-5 text-white">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#b7d1c7]">
                 What happens next
               </p>

@@ -5,12 +5,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from flask import Flask, jsonify, render_template, request, session
+from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 
 try:
     from settings import (
         CSV_DIR,
+        BOOTSTRAP_SAMPLE_DATA,
+        FRONTEND_DIST_DIR,
         FRONTEND_ORIGIN,
         PRODUCTION_DB_URL,
         SECRET_KEY,
@@ -30,6 +32,8 @@ try:
 except ImportError:
     from .settings import (
         CSV_DIR,
+        BOOTSTRAP_SAMPLE_DATA,
+        FRONTEND_DIST_DIR,
         FRONTEND_ORIGIN,
         PRODUCTION_DB_URL,
         SECRET_KEY,
@@ -47,6 +51,7 @@ except ImportError:
         validate_place_orders_request,
     )
 
+FRONTEND_DIST = Path(FRONTEND_DIST_DIR)
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=[FRONTEND_ORIGIN])
@@ -54,7 +59,10 @@ app.secret_key = SECRET_KEY
 app.config["SESSION_COOKIE_SECURE"] = SESSION_COOKIE_SECURE
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = SESSION_COOKIE_SAMESITE
-order_assistant = ProductionOperationsService(db_url=PRODUCTION_DB_URL)
+order_assistant = ProductionOperationsService(
+    db_url=PRODUCTION_DB_URL,
+    bootstrap_sample_data=BOOTSTRAP_SAMPLE_DATA,
+)
 smart_ordering = SmartOrderingService(order_assistant)
 live_simulation = InventorySimulationService(csv_dir=CSV_DIR, state_path=STATE_PATH)
 
@@ -494,8 +502,28 @@ def create_ingredient():
 
 
 @app.get("/")
-def index():
-    return render_template("index.html")
+@app.get("/<path:path>")
+def index(path: str = ""):
+    if path.startswith(("api/", "health")):
+        return jsonify({"success": False, "error": "Not found."}), 404
+
+    candidate = FRONTEND_DIST / path
+    if path and candidate.is_file():
+        return send_from_directory(FRONTEND_DIST, path)
+
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.is_file():
+        return send_from_directory(FRONTEND_DIST, "index.html")
+
+    return (
+        jsonify(
+            {
+                "success": False,
+                "error": "Frontend build is missing. Build the Vite app before serving the SPA.",
+            }
+        ),
+        503,
+    )
 
 
 if __name__ == "__main__":
