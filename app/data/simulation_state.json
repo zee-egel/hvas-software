@@ -1,0 +1,29 @@
+{
+  "current_week": 5,
+  "config": {
+    "order_variance": 18,
+    "restock_threshold": 1200,
+    "restock_amount": 1700,
+    "lookback_weeks": 4,
+    "usage_variance_pct": 8,
+    "waste_variance_pct": 3,
+    "learning_rate_pct": 22
+  },
+  "accuracy_history": [],
+  "generated_orders": [],
+  "last_tick": {
+    "predicted_food_orders": {},
+    "food_orders_this_week": {},
+    "restocked_ingredients": {},
+    "ingredient_usage": [],
+    "recent_events": []
+  },
+  "inventory_levels": {
+    "1": 6447.487390756996,
+    "2": 1615.2879672794909,
+    "3": 3240.2771528566054,
+    "4": 1613.0976034758694
+  },
+  "usage_profiles": {},
+  "running": false
+}

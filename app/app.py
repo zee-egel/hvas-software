@@ -4,52 +4,34 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+import sys
 
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 
-try:
-    from settings import (
-        CSV_DIR,
-        BOOTSTRAP_SAMPLE_DATA,
-        FRONTEND_DIST_DIR,
-        FRONTEND_ORIGIN,
-        PRODUCTION_DB_URL,
-        SECRET_KEY,
-        SESSION_COOKIE_SAMESITE,
-        SESSION_COOKIE_SECURE,
-        STATE_PATH,
-    )
-    from production_service import ProductionOperationsService
-    from scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
-    from simulation_service import InventorySimulationService
-    from smart_ordering.service import SmartOrderingService
-    from smart_ordering.validation import (
-        validate_forecast_request,
-        validate_order_draft_request,
-        validate_place_orders_request,
-    )
-except ImportError:
-    from .settings import (
-        CSV_DIR,
-        BOOTSTRAP_SAMPLE_DATA,
-        FRONTEND_DIST_DIR,
-        FRONTEND_ORIGIN,
-        PRODUCTION_DB_URL,
-        SECRET_KEY,
-        SESSION_COOKIE_SAMESITE,
-        SESSION_COOKIE_SECURE,
-        STATE_PATH,
-    )
-    from .production_service import ProductionOperationsService
-    from .scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
-    from .simulation_service import InventorySimulationService
-    from .smart_ordering.service import SmartOrderingService
-    from .smart_ordering.validation import (
-        validate_forecast_request,
-        validate_order_draft_request,
-        validate_place_orders_request,
-    )
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.settings import (
+    CSV_DIR,
+    BOOTSTRAP_SAMPLE_DATA,
+    FRONTEND_DIST_DIR,
+    FRONTEND_ORIGIN,
+    PRODUCTION_DB_URL,
+    SECRET_KEY,
+    SESSION_COOKIE_SAMESITE,
+    SESSION_COOKIE_SECURE,
+    STATE_PATH,
+)
+from app.production_service import ProductionOperationsService
+from app.scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
+from app.simulation_service import InventorySimulationService
+from app.smart_ordering.service import SmartOrderingService
+from app.smart_ordering.validation import (
+    validate_forecast_request,
+    validate_order_draft_request,
+    validate_place_orders_request,
+)
 
 FRONTEND_DIST = Path(FRONTEND_DIST_DIR)
 
