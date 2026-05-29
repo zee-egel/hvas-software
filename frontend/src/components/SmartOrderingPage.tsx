@@ -104,7 +104,7 @@ export default function SmartOrderingPage() {
 
     const timeoutId = window.setTimeout(() => {
       setConfettiActive(false);
-    }, 3200);
+    }, 4800);
 
     return () => window.clearTimeout(timeoutId);
   }, [confettiActive]);
@@ -299,10 +299,17 @@ export default function SmartOrderingPage() {
         <Confetti
           width={viewportSize.width}
           height={viewportSize.height}
-          numberOfPieces={220}
+          numberOfPieces={520}
           recycle={false}
-          gravity={0.18}
-          tweenDuration={12000}
+          gravity={0.16}
+          initialVelocityY={18}
+          tweenDuration={18000}
+          confettiSource={{
+            x: 0,
+            y: 0,
+            w: viewportSize.width,
+            h: 24,
+          }}
           className="pointer-events-none fixed! inset-0 z-50"
         />
       ) : null}
