@@ -42,6 +42,23 @@ export interface AuthUser {
   workspaceMode: "starter" | "live";
 }
 
+export interface DataSetupDocumentUploadResponse {
+  success: boolean;
+  candidates: NormalizedProductCandidate[];
+  document: {
+    name: string;
+    kind: string;
+    uploadedAt: string;
+  };
+  activation: {
+    importedCandidates: number;
+    canonicalProductsCreated: number;
+    canonicalProductsMatched: number;
+    productCount: number;
+  };
+  historicalImport?: HistoricalDatasetImportResponse | null;
+}
+
 export interface OnboardingData {
   restaurantType?: string;
   acquisitionSource?: string;
@@ -779,15 +796,7 @@ export async function resetOnboarding(): Promise<{
 export async function uploadDataSetupDocument(
   file: File,
   kind: "invoice" | "product-list",
-): Promise<{
-  success: boolean;
-  candidates: NormalizedProductCandidate[];
-  document: {
-    name: string;
-    kind: string;
-    uploadedAt: string;
-  };
-}> {
+): Promise<DataSetupDocumentUploadResponse> {
   const body = new FormData();
   body.append("file", file);
   body.append("kind", kind);
@@ -799,5 +808,27 @@ export async function uploadDataSetupDocument(
     throw new Error(
       await readErrorMessage(res, `Failed to upload setup document: ${res.status}`),
     );
+  return res.json();
+}
+
+export async function saveManualStockCounts(
+  items: Array<{ productName: string; quantity: number; unit?: string }>,
+): Promise<{
+  jobId: number;
+  status: string;
+  recordCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+}> {
+  const res = await apiFetch("/api/data-setup/manual-stock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      await readErrorMessage(res, `Failed to save manual stock counts: ${res.status}`),
+    );
+  }
   return res.json();
 }

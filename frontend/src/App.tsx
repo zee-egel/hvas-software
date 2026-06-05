@@ -304,9 +304,9 @@ function ProtectedAppShell() {
         />
       ) : null}
 
-      <div className="min-h-screen lg:flex">
+      <div className="min-h-screen">
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[rgba(17,24,21,0.06)] bg-[#f7f8f7] px-3 py-4 transition-transform duration-200 lg:sticky lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[rgba(17,24,21,0.06)] bg-[#f7f8f7] px-3 py-4 transition-transform duration-200 lg:translate-x-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } ${sidebarCollapsed ? "lg:w-24" : ""}`}
         >
@@ -316,8 +316,8 @@ function ProtectedAppShell() {
               onClick={() => navigate("/overview")}
               className="flex min-w-0 items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-white"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
-                <Logo className="h-8 w-8 object-contain" />
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                <Logo className="rounded-md object-contain" />
               </div>
               {!sidebarCollapsed ? (
                 <div className="min-w-0">
@@ -464,7 +464,11 @@ function ProtectedAppShell() {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div
+          className={`min-w-0 transition-[padding] duration-200 ${
+            sidebarCollapsed ? "lg:pl-24" : "lg:pl-72"
+          }`}
+        >
           <header className="sticky top-0 z-20 border-b border-[rgba(17,24,21,0.06)] bg-white/80 backdrop-blur-xl">
             <div className="mx-auto flex max-w-screen-2xl items-center gap-4 px-4 py-3 sm:px-6">
               <button

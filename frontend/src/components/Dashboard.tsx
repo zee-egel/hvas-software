@@ -17,51 +17,65 @@ export default function Dashboard() {
   const { data, loading, error, refresh, approveOrder } = useSimulation();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const starterMode = user?.workspaceMode === "starter";
   const onboarding = user?.onboardingData;
 
-  if (starterMode && onboarding) {
-    const starterProducts = onboarding.initialProducts.slice(0, 4);
-    const starterSignals = onboarding.forecastingSignals.slice(0, 4);
-    const starterSuppliers = onboarding.suppliers.slice(0, 3);
+  if (!data && !loading) {
+    return (
+      <ErrorState
+        title="Workspace unavailable"
+        message={error}
+        onRetry={() => void refresh()}
+      />
+    );
+  }
 
+  if (
+    data &&
+    (data.dataCompleteness.totalProducts === 0 ||
+      data.dataCompleteness.sufficientSalesHistoryProducts === 0)
+  ) {
+    const needsProducts = data.dataCompleteness.totalProducts === 0;
     return (
       <div className="space-y-5">
         <section className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white px-6 py-6 shadow-[0_16px_50px_rgba(19,27,24,0.06)]">
           <div className="inline-flex items-center gap-2 rounded-full bg-[#eef3f0] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6a65]">
             <Zap className="h-3.5 w-3.5" />
-            Starter workspace
+            {onboarding?.restaurantType ?? "Workspace setup"}
           </div>
           <h2 className="mt-4 max-w-3xl text-[1.7rem] font-semibold tracking-[-0.04em] text-[#17211d]">
-            {user.companyName} is set up with only your onboarding inputs.
+            {needsProducts
+              ? "Import your products to activate HVAS."
+              : "Import purchase or sales history to unlock forecasts."}
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[#66716d]">
-            HVAS is starting clean: no shared demo orders, no injected history, just the restaurant details you gave us.
+            {needsProducts
+              ? "HVAS only forecasts and recommends orders for imported products. Start with invoices or a product list."
+              : "Your products are live, but HVAS still needs real history before it can build demand forecasts and reorder suggestions."}
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
-                Restaurant type
+                Imported products
               </p>
-              <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
-                {onboarding.restaurantType ?? "Not set"}
-              </p>
-            </div>
-            <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
-                Ordering cadence
-              </p>
-              <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
-                {onboarding.orderingFrequency ?? "Not set"}
+              <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+                {data.dataCompleteness.totalProducts}
               </p>
             </div>
             <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
               <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
-                First goal
+                Forecast-ready products
+              </p>
+              <p className="mt-2 text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17211d]">
+                {data.dataCompleteness.sufficientSalesHistoryProducts}
+              </p>
+            </div>
+            <div className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7a8480]">
+                Primary goal
               </p>
               <p className="mt-2 text-[1.25rem] font-semibold tracking-[-0.03em] text-[#17211d]">
-                {onboarding.primaryGoal ?? "Understand demand"}
+                {onboarding?.primaryGoal ?? "Save time ordering"}
               </p>
             </div>
           </div>
@@ -72,26 +86,27 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
-                  What matters now
+                  Next best action
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
-                  Finish the first ordering loop
+                  Finish data setup
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/ordering")}
+                onClick={() => navigate("/data-setup")}
                 className="rounded-full border border-[#e5eae7] px-3 py-2 text-sm text-[#24302b]"
               >
-                Open smart ordering
+                Open data setup
               </button>
             </div>
-
             <div className="mt-5 space-y-3">
               {[
-                `Starter products: ${starterProducts.length > 0 ? starterProducts.join(", ") : "none selected"}.`,
-                `Forecast signals: ${starterSignals.length > 0 ? starterSignals.join(", ") : "default signals only"}.`,
-                `Suppliers: ${starterSuppliers.length > 0 ? starterSuppliers.join(", ") : "add suppliers next"}.`,
+                needsProducts
+                  ? "Upload invoices or a product list to create your canonical product catalog."
+                  : "Upload invoice history or a historical dataset so HVAS can learn real demand.",
+                "Save current stock counts for the imported products you want HVAS to order.",
+                "Return to Smart Ordering once live data is available.",
               ].map((line) => (
                 <div
                   key={line}
@@ -104,88 +119,52 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-
-            <div className="mt-5 rounded-[22px] bg-[#172f27] px-4 py-4 text-white">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#a8c5b8]">
-                Next best action
-              </p>
-              <p className="mt-2 text-base font-semibold">
-                Generate your first starter suggestions
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#d3e1da]">
-                HVAS can already build a first supplier draft from your products, cadence, and forecasting signals.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/ordering")}
-                  className="rounded-full bg-white px-3 py-2 text-sm font-medium text-[#172f27]"
-                >
-                  Generate first forecast
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/settings")}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-sm text-white"
-                >
-                  Review setup
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
           </article>
 
           <article className="rounded-[30px] border border-[rgba(17,24,21,0.06)] bg-white p-5 shadow-[0_12px_36px_rgba(19,27,24,0.04)]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#87918d]">
-                  Setup summary
+                  Data status
                 </p>
                 <h3 className="mt-2 text-lg font-semibold text-[#17211d]">
-                  What HVAS knows so far
+                  What HVAS can use now
                 </h3>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eef3f0] text-[#2f6a4f]">
                 <Truck className="h-4 w-4" />
               </div>
             </div>
-
             <div className="mt-5 space-y-3">
-              <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
-                <p className="text-sm font-medium text-[#17211d]">Location</p>
-                <p className="mt-1 text-sm text-[#69736f]">
-                  {onboarding.restaurantLocation?.city ?? "Not set"}
-                  {onboarding.restaurantLocation?.postalCodeOrNeighborhood
-                    ? ` · ${onboarding.restaurantLocation.postalCodeOrNeighborhood}`
-                    : ""}
-                </p>
-              </div>
               <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
                 <p className="text-sm font-medium text-[#17211d]">Products</p>
                 <p className="mt-1 text-sm text-[#69736f]">
-                  {starterProducts.length > 0 ? starterProducts.join(", ") : "No products selected yet"}
+                  {data.dataCompleteness.totalProducts > 0
+                    ? `${data.dataCompleteness.totalProducts} imported`
+                    : "No imported products yet"}
                 </p>
               </div>
               <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
-                <p className="text-sm font-medium text-[#17211d]">Signals</p>
+                <p className="text-sm font-medium text-[#17211d]">Demand history</p>
                 <p className="mt-1 text-sm text-[#69736f]">
-                  {starterSignals.length > 0 ? starterSignals.join(", ") : "Default signals only"}
+                  {data.dataCompleteness.sufficientSalesHistoryProducts > 0
+                    ? `${data.dataCompleteness.sufficientSalesHistoryProducts} products have usable history`
+                    : "No forecast-ready history yet"}
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-[#edf1ee] px-4 py-4">
+                <p className="text-sm font-medium text-[#17211d]">Location</p>
+                <p className="mt-1 text-sm text-[#69736f]">
+                  {onboarding?.restaurantLocation?.city ?? "Not set"}
+                  {onboarding?.restaurantLocation?.postalCodeOrNeighborhood
+                    ? ` · ${onboarding.restaurantLocation.postalCodeOrNeighborhood}`
+                    : ""}
                 </p>
               </div>
             </div>
           </article>
         </section>
       </div>
-    );
-  }
-
-  if (!data && !loading) {
-    return (
-      <ErrorState
-        title="Workspace unavailable"
-        message={error}
-        onRetry={() => void refresh()}
-      />
     );
   }
 
@@ -201,7 +180,10 @@ export default function Dashboard() {
           <Skeleton className="mt-3 h-4 w-full max-w-xl" />
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="rounded-[22px] bg-[#f6f8f6] px-4 py-4">
+              <div
+                key={index}
+                className="rounded-[22px] bg-[#f6f8f6] px-4 py-4"
+              >
                 <Skeleton className="h-3 w-24" />
                 <Skeleton className="mt-3 h-9 w-28" />
               </div>
@@ -270,10 +252,13 @@ export default function Dashboard() {
           {restaurantType}
         </div>
         <h2 className="mt-4 max-w-3xl text-[1.7rem] font-semibold tracking-[-0.04em] text-[#17211d]">
-          {user?.companyName ?? data.restaurant.name}: {data.summary.urgentActions} items need attention before the next order.
+          {user?.companyName ?? data.restaurant.name}:{" "}
+          {data.summary.urgentActions} items need attention before the next
+          order.
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-[#66716d]">
-          Focus on forecast risk, overstock risk, and the first goal you picked: {goalLabel.toLowerCase()}.
+          Focus on forecast risk, overstock risk, and the first goal you picked:{" "}
+          {goalLabel.toLowerCase()}.
         </p>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">

@@ -6,9 +6,6 @@ import math
 import random
 from typing import Any
 
-from .normalized_product_catalog import PRODUCT_CATALOG
-
-
 WEEKDAY_MULTIPLIERS = {
     0: 0.76,
     1: 0.82,
@@ -188,24 +185,9 @@ def generateRestaurantSimulation(weeks: int = 52) -> dict[str, Any]:
     sales_history: list[dict[str, Any]] = []
 
     all_days = [start_date + timedelta(days=offset) for offset in range((end_date - start_date).days + 1)]
-    contexts_by_date = {}
-    for day_index, target_date in enumerate(all_days):
-        context = build_daily_context(target_date)
-        contexts_by_date[target_date.isoformat()] = context
-        context_history.append(context)
-        for product in PRODUCT_CATALOG:
-            sales_history.append(
-                {
-                    "productId": product["id"],
-                    "date": target_date.isoformat(),
-                    "quantitySold": _generate_daily_sales(product, target_date, context, day_index),
-                }
-            )
+    for target_date in all_days:
+        context_history.append(build_daily_context(target_date))
 
-    inventory = [
-        {"productId": product["id"], "currentStock": float(product["currentStock"])}
-        for product in PRODUCT_CATALOG
-    ]
     future_context = [
         FutureContext(
             date=(date.today() + timedelta(days=offset)).isoformat(),
@@ -225,14 +207,14 @@ def generateRestaurantSimulation(weeks: int = 52) -> dict[str, Any]:
 
     return {
         "restaurant": RESTAURANT_PROFILE,
-        "products": [dict(product) for product in PRODUCT_CATALOG],
-        "inventory": inventory,
+        "products": [],
+        "inventory": [],
         "salesHistory": sales_history,
         "contextHistory": context_history,
         "futureContext": future_context,
         "metadata": {
             "weeksSimulated": weeks,
             "generatedFor": end_date.isoformat(),
-            "scenario": "HVAS Bistro in Den Haag Centrum with lunch+dinner demand drivers.",
+            "scenario": "Restaurant context scaffold without bundled product data.",
         },
     }

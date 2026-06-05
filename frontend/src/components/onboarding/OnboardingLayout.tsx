@@ -26,7 +26,7 @@ export default function OnboardingLayout({
         <header className="flex items-center justify-between px-6 py-5 sm:px-8 lg:px-12">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-[18px] border border-[rgba(23,52,43,0.08)] bg-white shadow-[0_6px_16px_rgba(15,23,42,0.05)]">
-              <Logo className="h-8 w-8 object-contain" />
+              <Logo className="rounded-md object-contain" />
             </div>
             <div>
               <p className="text-sm font-semibold tracking-[-0.02em] text-heading">

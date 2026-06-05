@@ -1,5 +1,4 @@
 from functools import wraps
-from dataclasses import asdict
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,7 +21,6 @@ from app.settings import (
     SESSION_COOKIE_SECURE,
 )
 from app.production_service import ProductionOperationsService
-from app.scripts.normalize_product_candidates import normalize_rows, parse_rows_from_file
 from app.smart_ordering.service import SmartOrderingService
 from app.smart_ordering.validation import (
     validate_forecast_request,
@@ -208,20 +206,23 @@ def normalize_data_setup_products():
     with NamedTemporaryFile(delete=True, suffix=suffix) as temp_file:
         temp_file.write(upload.read())
         temp_file.flush()
-        rows = parse_rows_from_file(Path(temp_file.name))
-        candidates = normalize_rows(rows)
+        result = order_assistant.import_data_setup_document(
+            file_path=Path(temp_file.name),
+            filename=upload.filename,
+            kind=kind,
+        )
 
-    return jsonify(
-        {
-            "success": True,
-            "candidates": [asdict(candidate) for candidate in candidates],
-            "document": {
-                "name": upload.filename,
-                "kind": kind,
-                "uploadedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            },
-        }
-    )
+    return jsonify(result)
+
+
+@app.post("/api/data-setup/manual-stock")
+@login_required
+def save_data_setup_manual_stock():
+    payload = request.get_json() or {}
+    counts = payload.get("items")
+    if not isinstance(counts, list):
+        raise ValueError("Manual stock payload requires an items array.")
+    return jsonify(order_assistant.save_manual_stock_counts_by_name(counts))
 
 
 @app.get("/api/smart-ordering/context")

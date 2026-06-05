@@ -19,9 +19,7 @@ import Skeleton from "./Skeleton";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { resetOnboarding, user } = useAuth();
-  const starterMode = user?.workspaceMode === "starter";
-  const onboarding = user?.onboardingData;
+  const { resetOnboarding } = useAuth();
   const [importStatus, setImportStatus] = useState<ImportStatusResponse | null>(
     null,
   );
@@ -41,12 +39,8 @@ export default function SettingsPage() {
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
 
   useEffect(() => {
-    if (starterMode) {
-      setLoading(false);
-      return;
-    }
     void reloadSettings();
-  }, [starterMode]);
+  }, []);
 
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -149,115 +143,6 @@ export default function SettingsPage() {
     } finally {
       setResettingOnboarding(false);
     }
-  }
-
-  if (starterMode && onboarding) {
-    return (
-      <div className="space-y-5">
-        <section className="rounded-[28px] border border-border bg-white px-6 py-6 shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f6f3] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-subtitle">
-                <Settings className="h-3.5 w-3.5" />
-                Starter Setup
-              </div>
-              <h1 className="mt-4 text-[28px] font-semibold tracking-[-0.03em] text-heading">
-                Your workspace is running on onboarding data only.
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-body">
-                No shared demo products or injected history are shown here. Everything below comes from the answers you gave during setup.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void onResetOnboarding()}
-              disabled={resettingOnboarding}
-              className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-white px-4 text-sm font-medium text-heading disabled:opacity-50"
-            >
-              {resettingOnboarding ? "Restarting..." : "Restart onboarding"}
-            </button>
-          </div>
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-          <div className="space-y-5">
-            <section className="rounded-[24px] border border-border bg-white p-5">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-emerald-dark" />
-                <p className="text-base font-semibold text-heading">
-                  Suppliers
-                </p>
-              </div>
-              <div className="mt-5 space-y-3">
-                {(onboarding.suppliers.length > 0
-                  ? onboarding.suppliers
-                  : ["No suppliers added yet"]).map((supplier) => (
-                  <div
-                    key={supplier}
-                    className="rounded-2xl bg-[#fafaf7] px-4 py-4 text-sm font-medium text-heading"
-                  >
-                    {supplier}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-border bg-white p-5">
-              <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-emerald-dark" />
-                <p className="text-base font-semibold text-heading">
-                  Forecasting context
-                </p>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {onboarding.forecastingSignals.map((signal) => (
-                  <span
-                    key={signal}
-                    className="rounded-full bg-[#edf4ef] px-3 py-2 text-sm font-medium text-heading"
-                  >
-                    {signal}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-5 text-sm text-body">
-                Location: {onboarding.restaurantLocation?.city ?? "Not set"}
-                {onboarding.restaurantLocation?.postalCodeOrNeighborhood
-                  ? ` · ${onboarding.restaurantLocation.postalCodeOrNeighborhood}`
-                  : ""}
-              </p>
-            </section>
-          </div>
-
-          <section className="rounded-[24px] border border-border bg-white p-5">
-            <div className="flex items-center gap-2">
-              <Package className="h-4 w-4 text-emerald-dark" />
-              <p className="text-base font-semibold text-heading">
-                Starter products
-              </p>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-body">
-              These are the first items HVAS uses to build starter suggestions from your onboarding setup.
-            </p>
-            <div className="mt-5 space-y-3">
-              {(onboarding.initialProducts.length > 0
-                ? onboarding.initialProducts
-                : ["No starter products added yet"]).map((product) => (
-                <div
-                  key={product}
-                  className="rounded-2xl bg-[#fafaf7] px-4 py-4"
-                >
-                  <p className="text-sm font-semibold text-heading">{product}</p>
-                  <p className="mt-1 text-xs text-body">
-                    {onboarding.restaurantType ?? "Starter product"} · onboarding only
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </section>
-      </div>
-    );
   }
 
   if (error && !productConfig.length && !supplierConfig.length && !loading) {

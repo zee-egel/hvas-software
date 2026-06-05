@@ -41,9 +41,9 @@ const methodCatalog: Record<DigitalTwinMethod, Omit<DigitalTwinMethodDetails, "m
     confidence: "Medium",
   },
   "Start with demo/sample data": {
-    why: "Useful when you want to understand the flow before connecting real sources.",
+    why: "Useful when you want to finish onboarding now and return with real imports later.",
     effort: "1 min",
-    predicts: "A sample HVAS loop for training and walkthroughs.",
+    predicts: "No live forecasting until products and history are imported.",
     confidence: "Low",
   },
 };
@@ -121,7 +121,7 @@ export function getDigitalTwinCompleteness(onboarding: OnboardingData) {
   if (selected.includes("Import product list")) score += 10;
   if (selected.includes("Connect POS system") || hasPosProvider) score += 20;
   if (selected.includes("Enter current stock manually") || hasManualStock) score += 12;
-  if (selected.includes("Start with demo/sample data")) score = Math.max(score, 35);
+  if (selected.includes("Start with demo/sample data")) score = Math.max(score, 18);
 
   return Math.min(score, 100);
 }

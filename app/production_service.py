@@ -6,6 +6,7 @@ from io import StringIO
 import json
 import math
 from math import ceil
+from pathlib import Path
 import re
 from typing import Any
 import zlib
@@ -33,17 +34,17 @@ from sqlalchemy.engine import Engine
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.data.restaurant_simulation import RESTAURANT_PROFILE
-from app.data.normalized_product_catalog import catalog_fingerprint
-from app.order_advice_seed import (
-    PRODUCT_CATALOG,
-    generate_initial_inventory,
-    generate_sales_history,
-)
 from app.order_advice_service import (
     build_explanation,
     calculate_financial_impact,
     calculate_forecast,
     calculate_reorder_quantity,
+)
+from app.scripts.normalize_product_candidates import (
+    NormalizedProductCandidate,
+    clean_text,
+    normalize_rows,
+    parse_rows_from_file,
 )
 
 
@@ -106,9 +107,7 @@ class ProductionOperationsService:
         self.metadata = MetaData()
         self._define_tables()
         self.metadata.create_all(self.engine)
-        if self.bootstrap_sample_data:
-            self._sync_seed_catalog_if_needed()
-            self._bootstrap_if_empty()
+        self._bootstrap_if_empty()
 
     def _define_tables(self) -> None:
         self.suppliers = Table(
@@ -232,6 +231,25 @@ class ProductionOperationsService:
             Column("rejected_count", Integer, nullable=False, default=0),
             Column("error_summary_json", Text, nullable=False, default="[]"),
         )
+        self.product_sources = Table(
+            "product_sources",
+            self.metadata,
+            Column("id", Integer, primary_key=True, autoincrement=True),
+            Column("product_id", Integer, ForeignKey("products.id"), nullable=False),
+            Column("supplier_id", Integer, ForeignKey("suppliers.id")),
+            Column("source_system", String(120), nullable=False),
+            Column("source_document_id", String(255)),
+            Column("source_document_name", String(255)),
+            Column("source_kind", String(50)),
+            Column("original_name", String(255), nullable=False),
+            Column("normalized_name", String(255), nullable=False),
+            Column("canonical_name", String(255), nullable=False),
+            Column("package_size", String(120)),
+            Column("confidence", Float, nullable=False, default=0.0),
+            Column("metadata_json", Text, nullable=False, default="{}"),
+            Column("created_at", DateTime(timezone=True), nullable=False),
+            Column("updated_at", DateTime(timezone=True), nullable=False),
+        )
         self.advice_runs = Table(
             "advice_runs",
             self.metadata,
@@ -281,116 +299,6 @@ class ProductionOperationsService:
         if has_products or has_runs:
             return
         self.recompute_advice_snapshot()
-
-    def _sync_seed_catalog_if_needed(self) -> None:
-        expected_fingerprint = catalog_fingerprint(PRODUCT_CATALOG)
-        current_settings = self._app_settings()
-        current_fingerprint = current_settings.get("seed_catalog_fingerprint")
-
-        with self.engine.begin() as conn:
-            current_product_count = conn.execute(
-                select(func.count()).select_from(self.products)
-            ).scalar_one()
-
-        if current_fingerprint == expected_fingerprint and current_product_count == len(PRODUCT_CATALOG):
-            return
-
-        self._reset_operational_history()
-        self._reset_catalog()
-        self._seed_catalog()
-        self._seed_bootstrap_imports()
-        self._set_app_setting("seed_catalog_fingerprint", expected_fingerprint)
-        self.recompute_advice_snapshot()
-
-    def _seed_catalog(self) -> None:
-        now = parse_dt(utc_timestamp())
-        suppliers_by_name: dict[str, int] = {}
-        with self.engine.begin() as conn:
-            supplier_names = sorted({product["supplierName"] for product in PRODUCT_CATALOG})
-            for name in supplier_names:
-                lead_times = [product["leadTimeDays"] for product in PRODUCT_CATALOG if product["supplierName"] == name]
-                result = conn.execute(
-                    insert(self.suppliers).values(
-                        name=name,
-                        default_lead_time_days=round(sum(lead_times) / len(lead_times)),
-                        active=True,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-                suppliers_by_name[name] = int(result.inserted_primary_key[0])
-            for product in PRODUCT_CATALOG:
-                conn.execute(
-                    insert(self.products).values(
-                        id=product["id"],
-                        name=product["name"],
-                        unit=product["unit"],
-                        category=product["category"],
-                        supplier_id=suppliers_by_name[product["supplierName"]],
-                        cost_price=product["costPrice"],
-                        selling_price=product["sellingPrice"],
-                        waste_risk_percentage=product["wasteRiskPercentage"],
-                        safety_stock=float(product["safetyStock"]),
-                        lead_time_days=int(product["leadTimeDays"]),
-                        shelf_life_days=int(product["shelfLifeDays"]),
-                        reorder_multiple=float(product.get("reorderMultiple", 1.0)),
-                        active=True,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                )
-
-    def _seed_bootstrap_imports(self) -> None:
-        now = datetime.now(UTC)
-        counts = []
-        for item in generate_initial_inventory():
-            counts.append(
-                {
-                    "productId": item["productId"],
-                    "externalId": f"bootstrap-count-{item['productId']}",
-                    "countedAt": (now - timedelta(days=1)).isoformat(),
-                    "quantity": item["currentStock"],
-                    "location": "main",
-                }
-            )
-        sales = []
-        for sale in generate_sales_history(weeks=12):
-            product = next(product for product in PRODUCT_CATALOG if product["id"] == sale["productId"])
-            sold_at = datetime.fromisoformat(sale["date"]).replace(tzinfo=UTC) + timedelta(hours=12)
-            sales.append(
-                {
-                    "productId": sale["productId"],
-                    "externalId": f"bootstrap-sale-{sale['productId']}-{sale['date']}",
-                    "soldAt": sold_at.isoformat(),
-                    "quantity": sale["quantitySold"],
-                    "unitPrice": product["sellingPrice"],
-                }
-            )
-        receipts = []
-        waste = []
-        for product in PRODUCT_CATALOG:
-            receipts.append(
-                {
-                    "productId": product["id"],
-                    "externalId": f"bootstrap-receipt-{product['id']}",
-                    "receivedAt": (now - timedelta(days=max(1, product["leadTimeDays"] + 1))).isoformat(),
-                    "quantity": max(product["safetyStock"] * 0.3, 1),
-                    "reference": "bootstrap receipt",
-                }
-            )
-            waste.append(
-                {
-                    "productId": product["id"],
-                    "externalId": f"bootstrap-waste-{product['id']}",
-                    "occurredAt": (now - timedelta(hours=18)).isoformat(),
-                    "quantity": round(max(0.0, product["wasteRiskPercentage"] / 1000), 2),
-                    "reason": "bootstrap spoilage",
-                }
-            )
-        self.import_inventory_counts(counts, source_system="bootstrap_seed", recompute=False)
-        self.import_sales(sales, source_system="bootstrap_seed", recompute=False)
-        self.import_receipts(receipts, source_system="bootstrap_seed", recompute=False)
-        self.import_waste(waste, source_system="bootstrap_seed", recompute=False)
 
     def get_health(self) -> dict[str, Any]:
         latest_run = self._latest_advice_run()
@@ -713,6 +621,141 @@ class ProductionOperationsService:
             "latestAdviceRunAt": dt_to_iso(latest["created_at"]) if latest else None,
         }
 
+    def import_data_setup_document(
+        self,
+        *,
+        file_path: Path,
+        filename: str,
+        kind: str,
+        source_system: str = "data_setup",
+    ) -> dict[str, Any]:
+        rows = parse_rows_from_file(file_path)
+        candidates = normalize_rows(rows)
+        activation_summary = self.ingest_normalized_products(
+            candidates=candidates,
+            source_system=source_system,
+            document_name=filename,
+            source_kind=kind,
+        )
+        historical_import = None
+        if kind == "invoice":
+            try:
+                historical_import = self.import_historical_dataset(
+                    self._read_tabular_upload_as_csv(file_path),
+                    source_system=f"{source_system}_invoice",
+                    reset_existing=False,
+                )
+            except ValueError:
+                historical_import = None
+        return {
+            "success": True,
+            "candidates": [self._candidate_to_dict(candidate) for candidate in candidates],
+            "document": {
+                "name": filename,
+                "kind": kind,
+                "uploadedAt": utc_timestamp(),
+            },
+            "activation": activation_summary,
+            "historicalImport": historical_import,
+        }
+
+    def ingest_normalized_products(
+        self,
+        *,
+        candidates: list[NormalizedProductCandidate],
+        source_system: str,
+        document_name: str | None = None,
+        source_kind: str | None = None,
+    ) -> dict[str, Any]:
+        if not candidates:
+            return {
+                "importedCandidates": 0,
+                "canonicalProductsCreated": 0,
+                "canonicalProductsMatched": 0,
+                "productCount": len(self._fetch_product_rows()),
+            }
+
+        created_count = 0
+        matched_count = 0
+        now = parse_dt(utc_timestamp())
+        with self.engine.begin() as conn:
+            for candidate in candidates:
+                supplier_name = clean_text(candidate.supplier) or "Imported supplier"
+                supplier_id = self._resolve_or_create_supplier(
+                    supplier_name,
+                    conn,
+                    {"lead_time_days": self._default_lead_time_days_for_category(candidate.category or "Imported")},
+                )
+                existing_product = self._find_existing_product_for_candidate(
+                    conn,
+                    candidate,
+                    supplier_id,
+                )
+                product_values = self._candidate_product_values(
+                    candidate,
+                    supplier_id=supplier_id,
+                    existing=existing_product,
+                    now=now,
+                )
+                if existing_product is None:
+                    result = conn.execute(insert(self.products).values(created_at=now, **product_values))
+                    product_id = int(result.inserted_primary_key[0])
+                    created_count += 1
+                else:
+                    product_id = int(existing_product["id"])
+                    conn.execute(
+                        update(self.products)
+                        .where(self.products.c.id == product_id)
+                        .values(**product_values)
+                    )
+                    matched_count += 1
+                self._upsert_product_source(
+                    conn,
+                    product_id=product_id,
+                    supplier_id=supplier_id,
+                    source_system=source_system,
+                    source_document_id=candidate.sourceDocumentId,
+                    source_document_name=document_name,
+                    source_kind=source_kind,
+                    candidate=candidate,
+                    now=now,
+                )
+        self.recompute_advice_snapshot()
+        return {
+            "importedCandidates": len(candidates),
+            "canonicalProductsCreated": created_count,
+            "canonicalProductsMatched": matched_count,
+            "productCount": len(self._fetch_product_rows()),
+        }
+
+    def save_manual_stock_counts_by_name(
+        self,
+        items: list[dict[str, Any]],
+        *,
+        source_system: str = "manual_stock_setup",
+    ) -> dict[str, Any]:
+        now = datetime.now(UTC)
+        count_items: list[dict[str, Any]] = []
+        for index, item in enumerate(items):
+            product_name = clean_text(item.get("productName"))
+            if not product_name:
+                continue
+            product_id = self._resolve_product_id_by_name(product_name)
+            if product_id is None:
+                raise ValueError(f"Unknown product for stock count: {product_name}")
+            count_items.append(
+                {
+                    "productId": product_id,
+                    "externalId": f"{source_system}-{product_id}-{int(now.timestamp())}-{index}",
+                    "countedAt": now.isoformat(),
+                    "quantity": float(item.get("quantity") or 0.0),
+                    "location": "main",
+                }
+            )
+        if not count_items:
+            raise ValueError("Manual stock counts require at least one valid product.")
+        return self.import_inventory_counts(count_items, source_system=source_system, recompute=True)
+
     def import_historical_dataset(
         self,
         csv_payload: str,
@@ -760,6 +803,7 @@ class ProductionOperationsService:
         product_ids: set[int] = set()
 
         for row in frame.to_dict(orient="records"):
+            row["source_system"] = source_system
             product_id = self._resolve_or_create_dataset_product(row)
             product_ids.add(product_id)
             row_date = parse_dt(str(row["date"]))
@@ -1035,6 +1079,7 @@ class ProductionOperationsService:
 
     def _reset_catalog(self) -> None:
         with self.engine.begin() as conn:
+            conn.execute(delete(self.product_sources))
             conn.execute(delete(self.products))
             conn.execute(delete(self.suppliers))
             conn.execute(delete(self.app_settings))
@@ -1381,6 +1426,184 @@ class ProductionOperationsService:
             "Imported": 10.0,
         }.get(category, 10.0)
 
+    def _candidate_to_dict(self, candidate: NormalizedProductCandidate) -> dict[str, Any]:
+        return {
+            "originalName": candidate.originalName,
+            "normalizedName": candidate.normalizedName,
+            "canonicalName": candidate.canonicalName,
+            "category": candidate.category,
+            "unit": candidate.unit,
+            "packageSize": candidate.packageSize,
+            "supplier": candidate.supplier,
+            "confidence": candidate.confidence,
+            "sourceDocumentId": candidate.sourceDocumentId,
+            "metadata": candidate.metadata,
+        }
+
+    def _read_tabular_upload_as_csv(self, file_path: Path) -> str:
+        suffix = file_path.suffix.lower()
+        if suffix == ".csv":
+            return file_path.read_text(encoding="utf-8-sig")
+        if suffix in {".xlsx", ".xls"}:
+            frame = pd.read_excel(file_path)
+            return frame.to_csv(index=False)
+        return file_path.read_text(encoding="utf-8")
+
+    def _resolve_product_id_by_name(self, name: str) -> int | None:
+        normalized_name = clean_text(name).lower()
+        if not normalized_name:
+            return None
+        with self.engine.begin() as conn:
+            source_match = conn.execute(
+                select(self.product_sources.c.product_id).where(
+                    func.lower(self.product_sources.c.original_name) == normalized_name
+                )
+            ).first()
+            if source_match is not None:
+                return int(source_match[0])
+            normalized_match = conn.execute(
+                select(self.product_sources.c.product_id).where(
+                    func.lower(self.product_sources.c.canonical_name) == normalized_name
+                )
+            ).first()
+            if normalized_match is not None:
+                return int(normalized_match[0])
+            product_match = conn.execute(
+                select(self.products.c.id).where(func.lower(self.products.c.name) == normalized_name)
+            ).first()
+        return int(product_match[0]) if product_match is not None else None
+
+    def _find_existing_product_for_candidate(
+        self,
+        conn: Any,
+        candidate: NormalizedProductCandidate,
+        supplier_id: int,
+    ) -> dict[str, Any] | None:
+        original_name = clean_text(candidate.originalName).lower()
+        normalized_name = clean_text(candidate.normalizedName).lower()
+        canonical_name = clean_text(candidate.canonicalName).lower()
+        if original_name or normalized_name:
+            source_row = conn.execute(
+                select(self.product_sources.c.product_id)
+                .where(self.product_sources.c.supplier_id == supplier_id)
+                .where(
+                    (func.lower(self.product_sources.c.original_name) == original_name)
+                    | (func.lower(self.product_sources.c.normalized_name) == normalized_name)
+                )
+                .limit(1)
+            ).first()
+            if source_row is not None:
+                return conn.execute(
+                    select(self.products).where(self.products.c.id == int(source_row[0]))
+                ).mappings().first()
+        if canonical_name:
+            return conn.execute(
+                select(self.products)
+                .where(func.lower(self.products.c.name) == canonical_name)
+                .where(self.products.c.supplier_id == supplier_id)
+                .limit(1)
+            ).mappings().first()
+        return None
+
+    def _candidate_product_values(
+        self,
+        candidate: NormalizedProductCandidate,
+        *,
+        supplier_id: int,
+        existing: dict[str, Any] | None,
+        now: datetime,
+    ) -> dict[str, Any]:
+        category = clean_text(candidate.category) or (
+            str(existing["category"]) if existing is not None else "Imported"
+        )
+        unit = clean_text(candidate.unit) or (
+            str(existing["unit"]) if existing is not None else "pcs"
+        )
+        package_multiple = self._package_multiple_from_candidate(candidate, unit)
+        cost_price = float(existing["cost_price"]) if existing is not None else 1.0
+        selling_price = float(existing["selling_price"]) if existing is not None else round(cost_price * 2.5, 2)
+        return {
+            "name": clean_text(candidate.canonicalName) or (
+                str(existing["name"]) if existing is not None else clean_text(candidate.originalName)
+            ),
+            "unit": unit,
+            "category": category,
+            "supplier_id": supplier_id,
+            "cost_price": cost_price,
+            "selling_price": max(selling_price, round(cost_price * 1.2, 2)),
+            "waste_risk_percentage": float(existing["waste_risk_percentage"])
+            if existing is not None
+            else self._default_waste_risk_percentage_for_category(category),
+            "safety_stock": float(existing["safety_stock"]) if existing is not None else max(1.0, package_multiple),
+            "lead_time_days": int(existing["lead_time_days"])
+            if existing is not None
+            else self._default_lead_time_days_for_category(category),
+            "shelf_life_days": int(existing["shelf_life_days"])
+            if existing is not None
+            else self._default_shelf_life_days_for_category(category),
+            "reorder_multiple": float(existing["reorder_multiple"]) if existing is not None else package_multiple,
+            "active": True,
+            "updated_at": now,
+        }
+
+    def _package_multiple_from_candidate(
+        self,
+        candidate: NormalizedProductCandidate,
+        unit: str,
+    ) -> float:
+        package_size = clean_text(candidate.packageSize)
+        if package_size:
+            numeric = re.search(r"(\d+(?:[.,]\d+)?)", package_size)
+            if numeric:
+                try:
+                    return max(0.5 if unit in {"kg", "ltr"} else 1.0, float(numeric.group(1).replace(",", ".")))
+                except ValueError:
+                    pass
+        return 0.5 if unit in {"kg", "ltr"} else 1.0
+
+    def _upsert_product_source(
+        self,
+        conn: Any,
+        *,
+        product_id: int,
+        supplier_id: int | None,
+        source_system: str,
+        source_document_id: str | None,
+        source_document_name: str | None,
+        source_kind: str | None,
+        candidate: NormalizedProductCandidate,
+        now: datetime,
+    ) -> None:
+        existing = conn.execute(
+            select(self.product_sources)
+            .where(self.product_sources.c.product_id == product_id)
+            .where(func.lower(self.product_sources.c.original_name) == clean_text(candidate.originalName).lower())
+            .where(self.product_sources.c.source_document_id == (clean_text(source_document_id) or None))
+        ).mappings().first()
+        values = {
+            "product_id": product_id,
+            "supplier_id": supplier_id,
+            "source_system": source_system,
+            "source_document_id": clean_text(source_document_id) or None,
+            "source_document_name": clean_text(source_document_name) or None,
+            "source_kind": clean_text(source_kind) or None,
+            "original_name": clean_text(candidate.originalName) or clean_text(candidate.canonicalName),
+            "normalized_name": clean_text(candidate.normalizedName) or clean_text(candidate.originalName).lower(),
+            "canonical_name": clean_text(candidate.canonicalName) or clean_text(candidate.originalName),
+            "package_size": clean_text(candidate.packageSize) or None,
+            "confidence": max(0.0, min(float(candidate.confidence or 0.0), 1.0)),
+            "metadata_json": json.dumps(candidate.metadata or {}),
+            "updated_at": now,
+        }
+        if existing is None:
+            conn.execute(insert(self.product_sources).values(created_at=now, **values))
+        else:
+            conn.execute(
+                update(self.product_sources)
+                .where(self.product_sources.c.id == existing["id"])
+                .values(**values)
+            )
+
     def _float_value(self, value: Any, default: float = 0.0) -> float:
         if self._is_missing_value(value):
             return default
@@ -1397,6 +1620,7 @@ class ProductionOperationsService:
     def _resolve_or_create_dataset_product(self, row: dict[str, Any]) -> int:
         product_id = row.get("product_id")
         product_name = (row.get("product_name") or "").strip()
+        source_original_name = product_name or str(row.get("description") or row.get("article_number") or "").strip()
 
         with self.engine.begin() as conn:
             existing = None
@@ -1446,6 +1670,28 @@ class ProductionOperationsService:
                     .where(self.products.c.id == existing["id"])
                     .values(**values)
                 )
+                self._upsert_product_source(
+                    conn,
+                    product_id=int(existing["id"]),
+                    supplier_id=supplier_id,
+                    source_system=str(row.get("source_system") or "historical_dataset"),
+                    source_document_id=clean_text(row.get("source_document_id")) or None,
+                    source_document_name=clean_text(row.get("source_document_name")) or None,
+                    source_kind="historical-dataset",
+                    candidate=NormalizedProductCandidate(
+                        originalName=source_original_name or existing["name"],
+                        normalizedName=normalize_column_name(source_original_name or existing["name"]),
+                        canonicalName=values["name"],
+                        category=values["category"],
+                        unit=values["unit"],
+                        packageSize=None,
+                        supplier=supplier_name,
+                        confidence=1.0,
+                        sourceDocumentId=clean_text(row.get("source_document_id")) or None,
+                        metadata={"source": "historical_dataset"},
+                    ),
+                    now=now,
+                )
                 return int(existing["id"])
 
             next_id = (
@@ -1462,6 +1708,28 @@ class ProductionOperationsService:
                     created_at=now,
                     **values,
                 )
+            )
+            self._upsert_product_source(
+                conn,
+                product_id=next_id,
+                supplier_id=supplier_id,
+                source_system=str(row.get("source_system") or "historical_dataset"),
+                source_document_id=clean_text(row.get("source_document_id")) or None,
+                source_document_name=clean_text(row.get("source_document_name")) or None,
+                source_kind="historical-dataset",
+                candidate=NormalizedProductCandidate(
+                    originalName=source_original_name or values["name"],
+                    normalizedName=normalize_column_name(source_original_name or values["name"]),
+                    canonicalName=values["name"],
+                    category=values["category"],
+                    unit=values["unit"],
+                    packageSize=None,
+                    supplier=supplier_name,
+                    confidence=1.0,
+                    sourceDocumentId=clean_text(row.get("source_document_id")) or None,
+                    metadata={"source": "historical_dataset"},
+                ),
+                now=now,
             )
             return next_id
 
@@ -2041,11 +2309,19 @@ class ProductionOperationsService:
             "highestWasteRiskCost": round(max((item["financialImpact"]["potentialWasteCost"] for item in items), default=0.0), 2),
             "highestShortageRiskRevenue": round(max((item["financialImpact"]["potentialLostRevenue"] for item in items), default=0.0), 2),
         }
+        sales_freshness = self._freshness_label(latest_sales_at, 1)
+        inventory_freshness = self._freshness_label(latest_count_at, COUNT_FRESHNESS_DAYS)
+        waste_freshness = self._freshness_label(latest_waste_at, 7)
+        overall_freshness = "fresh"
+        if "missing" in {sales_freshness, inventory_freshness}:
+            overall_freshness = "missing"
+        elif "stale" in {sales_freshness, inventory_freshness, waste_freshness}:
+            overall_freshness = "stale"
         freshness = {
-            "sales": self._freshness_label(latest_sales_at, 1),
-            "inventory": self._freshness_label(latest_count_at, COUNT_FRESHNESS_DAYS),
-            "waste": self._freshness_label(latest_waste_at, 7),
-            "overall": "stale" if any(label == "stale" for label in [self._freshness_label(latest_sales_at, 1), self._freshness_label(latest_count_at, COUNT_FRESHNESS_DAYS)]) else "fresh",
+            "sales": sales_freshness,
+            "inventory": inventory_freshness,
+            "waste": waste_freshness,
+            "overall": overall_freshness,
         }
         completeness = {
             "countedProducts": len([item for item in items if item["provenance"]["sourceCountTimestamp"]]),
@@ -2077,7 +2353,9 @@ class ProductionOperationsService:
                 "preventedWaste": summary["potentialWastePrevented"],
                 "lastUpdateLabel": "production snapshot",
                 "message": (
-                    f"HVAS analysed {summary['productsChecked']} live products, found "
+                    "Import products and history to activate forecasting."
+                    if summary["productsChecked"] == 0
+                    else f"HVAS analysed {summary['productsChecked']} live products, found "
                     f"{summary['urgentActions']} urgent actions and prepared "
                     f"{summary['purchaseOrdersPrepared']} supplier draft orders."
                 ),
@@ -2391,6 +2669,13 @@ class ProductionOperationsService:
                 ).scalar_one()
             )
 
+    def _workspace_mode(self) -> str:
+        with self.engine.begin() as conn:
+            product_count = int(
+                conn.execute(select(func.count()).select_from(self.products)).scalar_one()
+            )
+        return "live" if product_count > 0 else "starter"
+
     def _freshness_label(self, timestamp: datetime | None, max_age_days: int) -> str:
         if timestamp is None:
             return "missing"
@@ -2602,5 +2887,5 @@ class ProductionOperationsService:
             "onboardingCompleted": bool(user.get("onboarding_completed")),
             "onboardingData": onboarding_payload,
             "onboardingCompletedAt": dt_to_iso(user.get("onboarding_completed_at")),
-            "workspaceMode": "starter",
+            "workspaceMode": self._workspace_mode(),
         }

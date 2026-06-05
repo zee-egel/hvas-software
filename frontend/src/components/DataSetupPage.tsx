@@ -4,6 +4,7 @@ import { useAuth } from "../AuthContext";
 import {
   type OnboardingData,
   type NormalizedProductCandidate,
+  saveManualStockCounts,
   uploadDataSetupDocument,
 } from "../api/client";
 import {
@@ -51,7 +52,7 @@ function upsertMethod(onboarding: OnboardingData, method: string): OnboardingDat
 
 export default function DataSetupPage() {
   const navigate = useNavigate();
-  const { user, saveOnboarding } = useAuth();
+  const { user, saveOnboarding, refreshSession } = useAuth();
   const onboarding = user?.onboardingData
     ? normalizeOnboarding(user.onboardingData)
     : null;
@@ -61,6 +62,7 @@ export default function DataSetupPage() {
   const [savingStock, setSavingStock] = useState(false);
   const [savingPos, setSavingPos] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const [stockDraft, setStockDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       (onboarding?.manualStockCounts ?? []).map((item) => [
@@ -87,6 +89,10 @@ export default function DataSetupPage() {
   );
   const normalizedProducts = currentOnboarding.normalizedProducts ?? [];
   const uploadedDocuments = currentOnboarding.uploadedDocuments ?? [];
+  const stockProducts =
+    normalizedProducts.length > 0
+      ? normalizedProducts.map((item) => item.canonicalName)
+      : currentOnboarding.initialProducts;
   const unresolvedProducts = useMemo(() => {
     const canonicalNames = new Set(
       normalizedProducts.map((item) => item.canonicalName.toLowerCase()),
@@ -110,6 +116,7 @@ export default function DataSetupPage() {
     try {
       setUploadingKind(kind);
       setError(null);
+      setUploadFeedback(null);
       const response = await uploadDataSetupDocument(file, kind);
       const methodName =
         kind === "invoice"
@@ -132,6 +139,16 @@ export default function DataSetupPage() {
         digitalTwinSetup: upsertMethod(currentOnboarding, methodName),
       });
       await persist(nextData);
+      await refreshSession();
+      if (response.historicalImport) {
+        setUploadFeedback(
+          `Imported ${response.activation.productCount} products and ${response.historicalImport.rowsProcessed} history rows.`,
+        );
+      } else {
+        setUploadFeedback(
+          `Imported ${response.activation.importedCandidates} product candidates into ${response.activation.productCount} live products.`,
+        );
+      }
       if (kind === "invoice") {
         setInvoiceFile(null);
       } else {
@@ -153,6 +170,7 @@ export default function DataSetupPage() {
     try {
       setSavingStock(true);
       setError(null);
+      setUploadFeedback(null);
       const manualStockCounts = Object.entries(stockDraft)
         .map(([productName, quantity]) => ({
           productName,
@@ -161,19 +179,26 @@ export default function DataSetupPage() {
         }))
         .filter((item) => item.quantity > 0);
 
+      await saveManualStockCounts(manualStockCounts);
       await persist(
         normalizeOnboarding({
           ...currentOnboarding,
-        manualStockCounts,
+          manualStockCounts,
           digitalTwinSetup: upsertMethod(
             currentOnboarding,
             "Enter current stock manually",
           ),
         }),
       );
+      await refreshSession();
+      setUploadFeedback(`Saved ${manualStockCounts.length} live stock count${manualStockCounts.length === 1 ? "" : "s"}.`);
     } catch (saveError) {
       console.error("Failed to save stock counts", saveError);
-      setError("Could not save stock counts.");
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Could not save stock counts.",
+      );
     } finally {
       setSavingStock(false);
     }
@@ -267,6 +292,9 @@ export default function DataSetupPage() {
         </div>
 
         {error ? <p className="mt-4 text-sm text-alert">{error}</p> : null}
+        {uploadFeedback ? (
+          <p className="mt-3 text-sm text-emerald-dark">{uploadFeedback}</p>
+        ) : null}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1fr_1fr]">
@@ -333,10 +361,10 @@ export default function DataSetupPage() {
           <div className="mt-5 rounded-2xl bg-[#fafaf7] p-4">
             <p className="text-sm font-semibold text-heading">Current stock</p>
             <p className="mt-1 text-sm text-body">
-              Save a quick stock snapshot for your starter products.
+              Save a live stock snapshot for the imported products HVAS will forecast.
             </p>
             <div className="mt-4 space-y-3">
-              {onboarding.initialProducts.map((product) => (
+              {stockProducts.map((product) => (
                 <div key={product} className="grid gap-3 md:grid-cols-[1fr_120px]">
                   <div className="rounded-xl bg-white px-3 py-3 text-sm font-medium text-heading">
                     {product}

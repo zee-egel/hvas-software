@@ -199,6 +199,8 @@ class SmartOrderingService:
         for row in rows:
             state = inventory_state[row["productId"]]
             sales_history = sales_history_by_product_id[row["productId"]]
+            if not sales_history:
+                continue
             recent_days, recent_total, average_daily_usage = recent_usage_by_product_id[
                 row["productId"]
             ]

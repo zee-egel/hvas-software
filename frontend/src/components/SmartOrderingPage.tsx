@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useState } from "react";
-import Confetti from "react-confetti";
+import { useNavigate } from "react-router-dom";
 import {
   createSmartOrderDraft,
   fetchSmartOrderingForecast,
@@ -9,7 +9,6 @@ import {
   type SmartSupplierOrderDraft,
 } from "../api/client";
 import { useAuth } from "../AuthContext";
-import { buildStarterDrafts, buildStarterForecast } from "../lib/starterWorkspace";
 import {
   AlertTriangle,
   Check,
@@ -25,6 +24,7 @@ import {
 } from "./Icons";
 import { ErrorState } from "./PageState";
 import Skeleton from "./Skeleton";
+import ConfettiFireworks from "./ui/ConfettiFireworks";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("nl-NL", {
@@ -52,7 +52,15 @@ const warningLabels: Record<string, string> = {
   SUPPLIER_UNAVAILABLE: "Supplier unavailable",
 };
 
+type PlacementEmailPreview = {
+  supplierName: string;
+  recipient: string;
+  subject: string;
+  body: string;
+};
+
 export default function SmartOrderingPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [days, setDays] = useState(4);
   const [includeCurrentStock, setIncludeCurrentStock] = useState(true);
@@ -77,27 +85,15 @@ export default function SmartOrderingPage() {
   const [removedIds, setRemovedIds] = useState<number[]>([]);
   const [confirmedDraftIds, setConfirmedDraftIds] = useState<string[]>([]);
   const [placementSummary, setPlacementSummary] = useState<string | null>(null);
+  const [placementEmails, setPlacementEmails] = useState<PlacementEmailPreview[]>(
+    [],
+  );
   const [selectedSuggestion, setSelectedSuggestion] =
     useState<SmartOrderSuggestion | null>(null);
   const [search, setSearch] = useState("");
   const [confettiActive, setConfettiActive] = useState(false);
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const deferredSearch = useDeferredValue(search);
-  const starterMode = user?.workspaceMode === "starter";
-  const onboarding = user?.onboardingData;
-
-  useEffect(() => {
-    function updateViewportSize() {
-      setViewportSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    }
-
-    updateViewportSize();
-    window.addEventListener("resize", updateViewportSize);
-    return () => window.removeEventListener("resize", updateViewportSize);
-  }, []);
+  const needsProductImport = user?.workspaceMode === "starter";
 
   useEffect(() => {
     if (!confettiActive) return;
@@ -115,6 +111,7 @@ export default function SmartOrderingPage() {
     setDraftResponse(null);
     setConfirmedDraftIds([]);
     setPlacementSummary(null);
+    setPlacementEmails([]);
   }
 
   function applyForecast(nextForecast: SmartOrderingForecastResponse) {
@@ -130,14 +127,54 @@ export default function SmartOrderingPage() {
     resetInteractiveState();
   }
 
+  function triggerFireworks() {
+    setConfettiActive(false);
+    window.setTimeout(() => {
+      setConfettiActive(true);
+    }, 10);
+  }
+
+  function supplierRecipient(supplierName: string) {
+    const slug = supplierName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ".")
+      .replace(/^\.+|\.+$/g, "");
+    return `orders@${slug || "supplier"}.com`;
+  }
+
+  function buildPlacementEmails(
+    draftOrders: SmartSupplierOrderDraft[],
+    draftIds: string[],
+  ): PlacementEmailPreview[] {
+    return draftOrders
+      .filter((order) => draftIds.includes(order.draftOrderId))
+      .map((order) => ({
+        supplierName: order.supplierName,
+        recipient: supplierRecipient(order.supplierName),
+        subject: `Purchase order for ${order.supplierName} · ${formatDate(order.expectedDeliveryDate)}`,
+        body: [
+          `Hello ${order.supplierName},`,
+          "",
+          "Please find our order request below:",
+          ...order.productLines.map(
+            (line) =>
+              `- ${line.productName} (${line.productCode}): ${line.quantity} ${line.unit}`,
+          ),
+          "",
+          `Requested delivery: ${formatDate(order.expectedDeliveryDate)}`,
+          `Estimated total: ${formatCurrency(order.estimatedTotalCost)}`,
+          "",
+          "Please confirm availability and delivery timing.",
+          "",
+          `${user?.companyName ?? "HVAS Customer"}`,
+        ].join("\n"),
+      }));
+  }
+
   async function loadPage() {
     setLoading(true);
     setError(null);
     try {
-      if (starterMode && onboarding) {
-        applyForecast(buildStarterForecast(onboarding, days));
-        return;
-      }
       const forecastResult = await fetchSmartOrderingForecast({
         days,
         includeCurrentStock,
@@ -180,23 +217,12 @@ export default function SmartOrderingPage() {
     setLoading(true);
     setError(null);
     try {
-      if (starterMode && onboarding) {
-        const nextForecast = buildStarterForecast(onboarding, days);
-        applyForecast(nextForecast);
-        if (nextForecast.suggestions.length > 0) {
-          setConfettiActive(true);
-        }
-        return;
-      }
       const nextForecast = await fetchSmartOrderingForecast({
         days,
         includeCurrentStock,
         includeOutstandingOrders,
       });
       applyForecast(nextForecast);
-      if (nextForecast.suggestions.length > 0) {
-        setConfettiActive(true);
-      }
     } catch (loadError) {
       console.error(loadError);
       setError("Could not generate order suggestions.");
@@ -209,17 +235,6 @@ export default function SmartOrderingPage() {
     setDraftLoading(true);
     setError(null);
     try {
-      if (starterMode) {
-        const response = buildStarterDrafts(
-          visibleSuggestions,
-          quantities,
-          acceptedIds,
-        );
-        setDraftResponse(response);
-        setConfirmedDraftIds([]);
-        setPlacementSummary(null);
-        return;
-      }
       const response = await createSmartOrderDraft({
         days,
         includeCurrentStock,
@@ -251,21 +266,18 @@ export default function SmartOrderingPage() {
     setPlacing(true);
     setError(null);
     try {
-      if (starterMode) {
-        setPlacementSummary(
-          `${confirmedDraftIds.length} starter supplier drafts prepared on ${new Date().toLocaleString(
-            "nl-NL",
-          )}.`,
-        );
-        setConfirmedDraftIds([]);
-        return;
-      }
+      const emailPreviews = buildPlacementEmails(
+        draftResponse?.draftOrders ?? [],
+        confirmedDraftIds,
+      );
       const response = await placeSmartOrders(confirmedDraftIds);
       setPlacementSummary(
-        `${response.orders.length} supplier orders simulated on ${new Date(
-          response.placedAt,
-        ).toLocaleString("nl-NL")}.`,
+        `${response.orders.length} supplier order${
+          response.orders.length > 1 ? "s" : ""
+        } placed on ${new Date(response.placedAt).toLocaleString("nl-NL")}.`,
       );
+      setPlacementEmails(emailPreviews);
+      triggerFireworks();
       setConfirmedDraftIds([]);
     } catch (placementError) {
       console.error(placementError);
@@ -295,24 +307,7 @@ export default function SmartOrderingPage() {
 
   return (
     <div className="space-y-6">
-      {confettiActive ? (
-        <Confetti
-          width={viewportSize.width}
-          height={viewportSize.height}
-          numberOfPieces={520}
-          recycle={false}
-          gravity={0.16}
-          initialVelocityY={18}
-          tweenDuration={18000}
-          confettiSource={{
-            x: 0,
-            y: 0,
-            w: viewportSize.width,
-            h: 24,
-          }}
-          className="pointer-events-none fixed! inset-0 z-50"
-        />
-      ) : null}
+      <ConfettiFireworks active={confettiActive} />
 
       <section className="rounded-[28px] border border-border bg-white px-6 py-6 shadow-[0_20px_60px_rgba(19,52,43,0.05)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -324,9 +319,7 @@ export default function SmartOrderingPage() {
               Demand forecasting for the next order
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-body">
-              {starterMode
-                ? "HVAS is using only your onboarding answers here, so these starter suggestions begin without imported stock or sales history."
-                : "HVAS calculates demand, order quantities, warnings, and supplier drafts. You only adjust and confirm."}
+              HVAS calculates demand, order quantities, warnings, and supplier drafts from imported products, purchase history, and stock counts.
             </p>
           </div>
           <button
@@ -388,9 +381,7 @@ export default function SmartOrderingPage() {
                     Take current stock into account
                   </span>
                   <span className="block text-xs text-body">
-                    {starterMode
-                      ? "Starter mode has no counted stock yet, so these suggestions begin from zero stock."
-                      : "Uses the latest counted stock level to reduce over-ordering."}
+                    Uses the latest counted stock level to reduce over-ordering.
                   </span>
                 </span>
               </label>
@@ -409,9 +400,7 @@ export default function SmartOrderingPage() {
                     Take outstanding order quantities into account
                   </span>
                   <span className="block text-xs text-body">
-                    {starterMode
-                      ? "Starter mode has no live incoming orders yet."
-                      : "Subtracts incoming supplier quantities that are already on the way."}
+                    Subtracts incoming supplier quantities that are already on the way.
                   </span>
                 </span>
               </label>
@@ -495,21 +484,45 @@ export default function SmartOrderingPage() {
                   No suggestions loaded yet
                 </p>
                 <p className="mt-2 text-sm text-body">
-                  Generate suggestions to start the ordering flow.
+                  {needsProductImport
+                    ? "Import products first so HVAS has real items to forecast."
+                    : "Generate suggestions to start the ordering flow."}
                 </p>
+                {needsProductImport ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/data-setup")}
+                    className="mt-4 rounded-full bg-emerald-dark px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Import products
+                  </button>
+                ) : null}
               </div>
             ) : visibleSuggestions.length === 0 ? (
               <div className="mt-5 rounded-2xl border border-dashed border-border bg-[#f8fbf9] p-8 text-center">
                 <p className="text-base font-medium text-heading">
                   {normalizedSearch
                     ? "No matching suggestions"
-                    : "No products to review"}
+                    : needsProductImport
+                      ? "Import products to activate Smart Ordering"
+                      : "No forecast-ready products yet"}
                 </p>
                 <p className="mt-2 text-sm text-body">
                   {normalizedSearch
                     ? "Try a different search term."
-                    : "All suggestions have been removed. Refresh to generate them again."}
+                    : needsProductImport
+                      ? "Upload invoices or a product list to build your live product workspace."
+                      : "Upload invoice history or sales history for imported products to generate demand forecasts."}
                 </p>
+                {!normalizedSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/data-setup")}
+                    className="mt-4 rounded-full bg-emerald-dark px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Open data setup
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="mt-5 h-128 overflow-auto rounded-2xl border border-border bg-white p-3">
@@ -842,8 +855,84 @@ export default function SmartOrderingPage() {
             </div>
 
             {placementSummary ? (
-              <div className="mt-4 rounded-2xl border border-[#cce9df] bg-[#f4fbf8] px-4 py-3 text-sm text-heading">
-                {placementSummary}
+              <div className="mt-4 space-y-4">
+                <div className="rounded-2xl border border-[#cce9df] bg-[#f4fbf8] px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#dff3ea] text-emerald-dark">
+                      <Check className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-heading">
+                        Orders placed successfully
+                      </p>
+                      <p className="mt-1 text-sm text-heading">
+                        {placementSummary}
+                      </p>
+                      <p className="mt-2 text-xs text-body">
+                        HVAS prepared the supplier emails below so you can review exactly what gets sent.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {placementEmails.length > 0 ? (
+                  <div className="rounded-3xl border border-border bg-[#fbfcfb] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-dark">
+                          Outgoing supplier emails
+                        </p>
+                        <h3 className="mt-2 text-lg font-semibold text-heading">
+                          Ready to send
+                        </h3>
+                      </div>
+                      <div className="rounded-full bg-white px-3 py-1.5 text-xs text-body">
+                        {placementEmails.length} draft{placementEmails.length > 1 ? "s" : ""}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {placementEmails.map((email) => (
+                        <article
+                          key={`${email.supplierName}-${email.recipient}`}
+                          className="rounded-2xl border border-border bg-white p-4"
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-heading">
+                                {email.supplierName}
+                              </p>
+                              <p className="mt-1 text-xs text-body">
+                                To: {email.recipient}
+                              </p>
+                            </div>
+                            <div className="rounded-full bg-[#f4f8f5] px-3 py-1 text-xs text-body">
+                              Auto-generated
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl bg-[#f8fbf9] px-4 py-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-body">
+                              Subject
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-heading">
+                              {email.subject}
+                            </p>
+                          </div>
+
+                          <div className="mt-3 rounded-2xl bg-[#f8fbf9] px-4 py-3">
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-body">
+                              Message preview
+                            </p>
+                            <pre className="mt-2 whitespace-pre-wrap font-sans text-sm leading-6 text-heading">
+                              {email.body}
+                            </pre>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {error && forecast ? (
