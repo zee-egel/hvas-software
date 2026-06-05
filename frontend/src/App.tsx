@@ -31,6 +31,7 @@ import Logo from "./components/Logo";
 import LoginPage from "./components/auth/LoginPage";
 import SignupPage from "./components/auth/SignupPage";
 import OnboardingPage from "./components/onboarding/OnboardingPage";
+import { MarketingLandingPage } from "./pages";
 import { useSimulation } from "./useSimulation";
 
 type NavigationItem = {
@@ -147,7 +148,7 @@ function CommandPalette({
         onClick={onClose}
       />
       <div className="relative mx-auto mt-16 w-11/12 max-w-2xl overflow-hidden rounded-3xl border border-[#dfe6e2] bg-white shadow-2xl">
-        <div className="flex items-center gap-3 border-b border-[#edf1ee] px-4 py-4">
+        <div className="flex items-center gap-3 border-b border-progress-track px-4 py-4">
           <Search className="h-4 w-4 text-[#7e8a85]" />
           <input
             autoFocus
@@ -618,6 +619,7 @@ function ProtectedApp() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<MarketingLandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/onboarding" element={<ProtectedApp />} />

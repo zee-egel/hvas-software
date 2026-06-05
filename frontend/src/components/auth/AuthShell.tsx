@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import Logo from "../Logo";
+import { ArrowRight } from "../Icons";
 
 export default function AuthShell({
   title,
@@ -18,9 +19,17 @@ export default function AuthShell({
       <div className="grid min-h-screen lg:grid-cols-[2fr_3fr]">
         <section className="flex min-h-screen items-center justify-center bg-[#fffdfa] px-6 py-10">
           <div className="w-full max-w-108">
-            <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 rounded-full border border-[#d9e2dd] bg-white px-4 py-2 text-sm font-medium text-emerald-dark transition-colors hover:border-[#cbd7d1] hover:bg-[#f8fbf9]"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              Back to website
+            </Link>
+
+            <div className="mt-8 flex items-center gap-3">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[#d9e2dd] bg-white">
-                <Logo className="h-10 w-10 object-contain" />
+                <Logo className="h-12 w-12 object-contain rounded-md" />
               </div>
               <div>
                 <p className="text-lg font-semibold tracking-[-0.03em] text-emerald-dark">
