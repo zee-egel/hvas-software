@@ -55,7 +55,7 @@ export default function AuthShell({
             <div className="mt-6">{footer}</div>
 
             <div className="mt-8 border-t border-[#e3ebe6] pt-4 text-center text-xs text-[#7b8782]">
-              <p>&copy; 2026 HVAS Systemen BV</p>
+              <p>&copy; 2026 HVAS Systems BV</p>
               <div className="mt-2 flex items-center justify-center gap-5">
                 <Link to="/login" className="hover:text-heading">
                   Privacy
