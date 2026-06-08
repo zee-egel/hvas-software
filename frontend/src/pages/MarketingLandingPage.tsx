@@ -23,10 +23,15 @@ import {
   Zap,
 } from "../components/Icons";
 
-const navigation = [
+type NavigationItem =
+  | { label: string; href: string; to?: never }
+  | { label: string; to: string; href?: never };
+
+const navigation: NavigationItem[] = [
   { label: "Platform", href: "#platform" },
   { label: "Workflow", href: "#workflow" },
   { label: "FAQs", href: "#faqs" },
+  { label: "About", to: "/about" },
 ];
 
 const signals = [
@@ -156,13 +161,23 @@ export default function MarketingLandingPage() {
 
           <nav className="hidden items-center gap-8 lg:flex">
             {navigation.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="text-sm font-medium text-[#5f6a65] transition-colors hover:text-[#17342b]"
-              >
-                {item.label}
-              </a>
+              item.to ? (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="text-sm font-medium text-[#5f6a65] transition-colors hover:text-[#17342b]"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm font-medium text-[#5f6a65] transition-colors hover:text-[#17342b]"
+                >
+                  {item.label}
+                </a>
+              )
             ))}
           </nav>
 
@@ -221,14 +236,25 @@ export default function MarketingLandingPage() {
 
             <div className="mt-10 space-y-3">
               {navigation.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block rounded-2xl bg-white px-4 py-4 text-base font-medium text-[#17342b] shadow-sm"
-                >
-                  {item.label}
-                </a>
+                item.to ? (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block rounded-2xl bg-white px-4 py-4 text-base font-medium text-[#17342b] shadow-sm"
+                  >
+                    {item.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block rounded-2xl bg-white px-4 py-4 text-base font-medium text-[#17342b] shadow-sm"
+                  >
+                    {item.label}
+                  </a>
+                )
               ))}
             </div>
 

@@ -31,7 +31,7 @@ import Logo from "./components/Logo";
 import LoginPage from "./components/auth/LoginPage";
 import SignupPage from "./components/auth/SignupPage";
 import OnboardingPage from "./components/onboarding/OnboardingPage";
-import { MarketingLandingPage } from "./pages";
+import { AboutPage, MarketingLandingPage } from "./pages";
 import { useSimulation } from "./useSimulation";
 
 type NavigationItem = {
@@ -620,6 +620,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<MarketingLandingPage />} />
+      <Route path="/about" element={<AboutPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/onboarding" element={<ProtectedApp />} />
